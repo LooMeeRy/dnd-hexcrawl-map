@@ -21,6 +21,7 @@ export default function PlayerView() {
   const [dmTokens, setDmTokens] = useState({});
   
   const [cameraTarget, setCameraTarget] = useState({ q: 0, r: 0 });
+  const [hasFocused, setHasFocused] = useState(false);
   const [status, setStatus] = useState(roomCode ? 'Connecting...' : 'Local Sync (This Computer Only)');
   const [campaignId, setCampaignId] = useState(null);
   
@@ -147,6 +148,12 @@ export default function PlayerView() {
   }, [campaignId, roomCode, myPlayerId]);
 
   useEffect(() => {
+    if (!roomCode || hasFocused || !playerTokens[myPlayerId]) return;
+    setCameraTarget({ q: playerTokens[myPlayerId].q, r: playerTokens[myPlayerId].r });
+    setHasFocused(true);
+  }, [playerTokens, myPlayerId, hasFocused, roomCode]);
+
+  useEffect(() => {
     const handleClick = () => setContextMenu(prev => ({ ...prev, visible: false }));
     document.addEventListener('click', handleClick);
     return () => document.removeEventListener('click', handleClick);
@@ -179,15 +186,11 @@ export default function PlayerView() {
     localStorage.setItem(`dnd-player-image-${campaignId}`, playerImage);
     setSetupModalOpen(false);
     if (mqttClientRef.current) {
-       const myExistingToken = playerTokens[myPlayerId];
-       const q = myExistingToken ? myExistingToken.q : 0;
-       const r = myExistingToken ? myExistingToken.r : 0;
        mqttClientRef.current.publish(`dnd-room/${roomCode}/action`, JSON.stringify({ 
          type: 'add_player_token', 
          playerId: myPlayerId, 
          name: playerName, 
-         image: playerImage,
-         q, r
+         image: playerImage
        }));
     }
   };

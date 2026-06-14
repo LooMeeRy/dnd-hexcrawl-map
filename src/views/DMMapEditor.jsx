@@ -118,7 +118,19 @@ export default function DMMapEditor() {
         try {
           const action = JSON.parse(message.toString());
           if (action.type === 'add_player_token' || action.type === 'change_player_image') {
-            setPlayerTokens(prev => ({ ...prev, [action.playerId]: { ...prev[action.playerId], image: action.image, name: action.name, q: action.q || 0, r: action.r || 0 } }));
+            setPlayerTokens(prev => {
+              const existing = prev[action.playerId] || {};
+              return { 
+                ...prev, 
+                [action.playerId]: { 
+                  ...existing, 
+                  image: action.image, 
+                  name: action.name, 
+                  q: action.q !== undefined ? action.q : (existing.q !== undefined ? existing.q : 0), 
+                  r: action.r !== undefined ? action.r : (existing.r !== undefined ? existing.r : 0) 
+                } 
+              };
+            });
           }
           if (action.type === 'move_player') {
             setPlayerTokens(prev => {
