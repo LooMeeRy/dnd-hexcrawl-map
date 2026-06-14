@@ -47,7 +47,7 @@ export default function DMView() {
             className="room-input"
             style={{ marginBottom: 0, flex: 1 }}
           />
-          <button className="primary-btn" onClick={createCampaign} style={{ whiteSpace: 'nowrap', margin: 0, height: '100%' }}>
+          <button style={{ padding: '10px 16px', borderRadius: '12px', border: 'none', background: 'white', color: '#121212', cursor: 'pointer', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', whiteSpace: 'nowrap' }} onClick={createCampaign}>
             Create
           </button>
         </div>
