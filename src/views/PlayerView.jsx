@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import mqtt from 'mqtt';
 import { compressTokenImage } from '../utils';
 
@@ -14,6 +14,7 @@ function getHexPixel(q, r) {
 export default function PlayerView() {
   const [searchParams] = useSearchParams();
   const roomCode = searchParams.get('room');
+  const navigate = useNavigate();
   
   const [activeHexes, setActiveHexes] = useState({});
   const [playerTokens, setPlayerTokens] = useState({});
@@ -204,6 +205,9 @@ export default function PlayerView() {
       <div className="bg-glow"></div>
       
       <div className="app-header">
+        <button className="status-badge" style={{ cursor: 'pointer', color: '#aaa', background: 'transparent', border: 'none' }} onClick={() => navigate('/')}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 18l-6-6 6-6"/></svg>
+        </button>
         <div className="status-badge">Player View {playerName && `(${playerName})`}</div>
         <div className={`status-badge ${roomCode && status.includes('Connected') ? 'online' : ''}`}>
           {status}
