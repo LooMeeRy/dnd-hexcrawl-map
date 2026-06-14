@@ -38,17 +38,17 @@ export default function DMView() {
         <h1 style={{ textAlign: 'center' }}>Campaign Manager</h1>
         <p style={{ textAlign: 'center' }}>Select an existing campaign or create a new one.</p>
         
-        <div style={{ display: 'flex', gap: '12px', marginBottom: '32px' }}>
+        <div style={{ display: 'flex', gap: '12px', marginBottom: '32px', alignItems: 'center', justifyContent: 'center' }}>
           <input 
             type="text" 
             placeholder="New Campaign Name (e.g. Curse of Strahd)" 
             value={newCampaignName}
             onChange={e => setNewCampaignName(e.target.value)}
             className="room-input"
-            style={{ marginBottom: 0 }}
+            style={{ marginBottom: 0, flex: 1 }}
           />
-          <button className="primary-btn" onClick={createCampaign} style={{ whiteSpace: 'nowrap' }}>
-            <span>Create</span>
+          <button className="primary-btn" onClick={createCampaign} style={{ whiteSpace: 'nowrap', margin: 0, height: '100%' }}>
+            Create
           </button>
         </div>
 
