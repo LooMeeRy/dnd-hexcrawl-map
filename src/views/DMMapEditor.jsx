@@ -376,7 +376,7 @@ export default function DMMapEditor() {
                 onMouseDown={e => handleDmTokenMouseDown(e, id)}
                 onContextMenu={e => handleDmTokenContextMenu(e, id)}
               >
-                <img src={t.image} width={64} height={64} style={{ borderRadius: '50%', border: '2px dashed rgba(255,85,85,0.8)', pointerEvents: 'none', objectFit: 'cover' }} />
+                <img src={t.image} width={t.size || 64} height={t.size || 64} style={{ borderRadius: '50%', border: '2px dashed rgba(255,85,85,0.8)', pointerEvents: 'none', objectFit: 'cover' }} />
               </div>
             );
           })}
@@ -430,6 +430,18 @@ export default function DMMapEditor() {
           )}
           {contextMenu.type === 'dm_token' && (
             <>
+              <button onClick={() => {
+                setDmTokens(prev => {
+                  const t = prev[contextMenu.targetId];
+                  return { ...prev, [contextMenu.targetId]: { ...t, size: (t.size || 64) * 1.25 } };
+                });
+              }}>Increase Size (+)</button>
+              <button onClick={() => {
+                setDmTokens(prev => {
+                  const t = prev[contextMenu.targetId];
+                  return { ...prev, [contextMenu.targetId]: { ...t, size: Math.max(16, (t.size || 64) * 0.8) } };
+                });
+              }}>Decrease Size (-)</button>
               <button className="danger-menu-item" onClick={() => {
                 const nt = {...dmTokens}; delete nt[contextMenu.targetId]; setDmTokens(nt);
                 setContextMenu({ ...contextMenu, visible: false });

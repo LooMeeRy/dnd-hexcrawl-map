@@ -212,7 +212,7 @@ export default function PlayerView() {
           {/* DM Tokens */}
           {Object.entries(dmTokens).map(([id, t]) => (
             <div key={id} style={{ position: 'absolute', left: t.x, top: t.y, transform: 'translate(-50%, -50%)', zIndex: 10 }}>
-              <img src={t.image} width={64} height={64} style={{ borderRadius: '50%', border: '2px dashed rgba(255,85,85,0.8)', pointerEvents: 'none', objectFit: 'cover' }} />
+              <img src={t.image} width={t.size || 64} height={t.size || 64} style={{ borderRadius: '50%', border: '2px dashed rgba(255,85,85,0.8)', pointerEvents: 'none', objectFit: 'cover' }} />
             </div>
           ))}
 
