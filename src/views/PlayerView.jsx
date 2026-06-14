@@ -16,7 +16,7 @@ export default function PlayerView() {
   
   const [activeHexes, setActiveHexes] = useState(() => {
     if (roomCode) return {};
-    const saved = localStorage.getItem('dnd-map');
+    const saved = localStorage.getItem('dnd-map-local-sync');
     return saved ? JSON.parse(saved) : {};
   });
   
@@ -26,7 +26,7 @@ export default function PlayerView() {
   useEffect(() => {
     if (roomCode) return; 
     const handleStorage = (e) => {
-      if (e.key === 'dnd-map' && e.newValue) {
+      if (e.key === 'dnd-map-local-sync' && e.newValue) {
         setActiveHexes(JSON.parse(e.newValue));
       }
     };
@@ -40,17 +40,27 @@ export default function PlayerView() {
     setStatus('Looking for DM...');
     const client = mqtt.connect('wss://broker.emqx.io:8084/mqtt');
     let timeoutId;
+    let pingInterval;
     
     client.on('connect', () => {
+      const playerId = Math.random().toString(36).substring(2, 9);
+      
       // Subscribe to map updates and room closure
       client.subscribe(`dnd-room/${roomCode}/map`);
       client.subscribe(`dnd-room/${roomCode}/closed`);
+      
       // Request map from DM
       client.publish(`dnd-room/${roomCode}/request`, 'hello');
+      
+      // Start Heartbeat
+      pingInterval = setInterval(() => {
+        client.publish(`dnd-room/${roomCode}/ping`, playerId);
+      }, 2000);
       
       // If we don't hear back in 4 seconds, the room doesn't exist
       timeoutId = setTimeout(() => {
         setStatus('Error: Room not found or DM is offline.');
+        clearInterval(pingInterval);
         client.end();
       }, 4000);
     });
@@ -87,6 +97,7 @@ export default function PlayerView() {
     
     return () => {
       clearTimeout(timeoutId);
+      if (pingInterval) clearInterval(pingInterval);
       client.end();
     };
   }, [roomCode]);
