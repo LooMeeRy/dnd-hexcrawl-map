@@ -214,3 +214,65 @@ button:active { transform: scale(0.96); }
   border-radius: 999px; font-size: 0.875rem; font-weight: 600; color: #aaa;
 }
 .status-badge.online { color: #00ffaa; border-color: rgba(0, 255, 170, 0.3); }
+
+/* Image Library Gallery */
+.library-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+  max-height: 180px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+.library-gallery::-webkit-scrollbar { width: 6px; }
+.library-gallery::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 4px; }
+.library-item {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 8px;
+  overflow: hidden;
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: border-color 0.2s, transform 0.2s;
+}
+.library-item:hover {
+  transform: scale(1.05);
+  border-color: rgba(255,255,255,0.5);
+}
+.library-item.selected {
+  border-color: #55ff55;
+}
+.library-item img {
+  width: 100%; height: 100%; object-fit: cover;
+}
+.library-item-delete {
+  position: absolute; top: 2px; right: 2px;
+  width: 20px; height: 20px; border-radius: 50%;
+  background: rgba(255,0,0,0.8); color: white;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; border: none; cursor: pointer;
+  opacity: 0; transition: opacity 0.2s;
+  padding: 0;
+}
+.library-item:hover .library-item-delete {
+  opacity: 1;
+}
+.library-header {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-top: 24px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 16px;
+}
+.library-header h4 {
+  margin: 0; font-size: 0.875rem; font-weight: 600; color: #aaa;
+}
+.library-upload-btn-wrap {
+  position: relative; display: inline-block;
+}
+.library-upload-btn-wrap input[type="file"] {
+  position: absolute; left: 0; top: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer;
+}
+.library-upload-btn {
+  background: rgba(255,255,255,0.1); color: #fff;
+  border: none; padding: 4px 12px; border-radius: 4px; font-size: 0.75rem; cursor: pointer; pointer-events: none;
+}

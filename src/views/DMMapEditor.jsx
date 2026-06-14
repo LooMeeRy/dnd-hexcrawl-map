@@ -49,7 +49,10 @@ export default function DMMapEditor() {
   const [markerCoord, setMarkerCoord] = useState(null);
 
   const [cameraTarget, setCameraTarget] = useState({ q: 0, r: 0 });
-  const [contextMenu, setContextMenu] = useState({ visible: false, type: 'hex', x: 0, y: 0, q: 0, r: 0, targetId: null });
+  const [contextMenu, setContextMenu] = useState({ visible: false, type: 'hex', gridX: 0, gridY: 0, q: 0, r: 0, targetId: null });
+  const [savedImages, setSavedImages] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('dnd-saved-images') || '[]'); } catch { return []; }
+  });
   const [movingPlayerTokenId, setMovingPlayerTokenId] = useState(null);
   
   const [roomCode, setRoomCode] = useState(null);
@@ -210,10 +213,6 @@ export default function DMMapEditor() {
   const handleActiveHexContextMenu = (e, q, r) => {
     e.preventDefault(); e.stopPropagation();
     setCameraTarget({ q, r });
-    const centerPos = getHexPixel(q, r); // we are about to move the camera here
-    // Wait, if we use e.clientX and the CURRENT centerPos, it works perfectly.
-    // Actually, centerPos state hasn't updated yet! 
-    // We should just use the exact Hex coordinate!
     const hexPos = getHexPixel(q, r);
     setContextMenu({ visible: true, type: 'hex', gridX: hexPos.x + 20, gridY: hexPos.y, q, r });
   };
@@ -224,8 +223,6 @@ export default function DMMapEditor() {
   };
   const handlePlayerTokenContextMenu = (e, id) => {
     e.preventDefault(); e.stopPropagation();
-    // For player token, we can estimate position from mouse using current centerPos
-    // We must use the OLD cameraTarget because setCameraTarget hasn't re-rendered yet.
     const currentCenter = getHexPixel(cameraTarget.q, cameraTarget.r);
     const gridX = e.clientX - window.innerWidth / 2 + currentCenter.x;
     const gridY = e.clientY - window.innerHeight / 2 + currentCenter.y;
@@ -241,25 +238,50 @@ export default function DMMapEditor() {
   const handleImageUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    setImageUrl("");
     const reader = new FileReader();
     reader.onload = (event) => {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        let width = img.width; let height = img.height;
-        if (width > height) {
-          if (width > 256) { height *= 256 / width; width = 256; }
-        } else {
-          if (height > 256) { width *= 256 / height; height = 256; }
-        }
-        canvas.width = width; canvas.height = height;
-        canvas.getContext('2d').drawImage(img, 0, 0, width, height);
-        setImageFile(canvas.toDataURL('image/jpeg', 0.7));
-      };
-      img.src = event.target.result;
+       const img = new Image();
+       img.onload = () => {
+         const canvas = document.createElement('canvas');
+         const MAX_SIZE = 256;
+         let w = img.width; let h = img.height;
+         if (w > h) { if (w > MAX_SIZE) { h *= MAX_SIZE / w; w = MAX_SIZE; } } else { if (h > MAX_SIZE) { w *= MAX_SIZE / h; h = MAX_SIZE; } }
+         canvas.width = w; canvas.height = h;
+         const ctx = canvas.getContext('2d');
+         ctx.drawImage(img, 0, 0, w, h);
+         setImageUrl(canvas.toDataURL('image/jpeg', 0.8));
+       };
+       img.src = event.target.result;
     };
     reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+
+  const handleAddToLibrary = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+       const img = new Image();
+       img.onload = () => {
+         const canvas = document.createElement('canvas');
+         const MAX_SIZE = 256;
+         let w = img.width; let h = img.height;
+         if (w > h) { if (w > MAX_SIZE) { h *= MAX_SIZE / w; w = MAX_SIZE; } } else { if (h > MAX_SIZE) { w *= MAX_SIZE / h; h = MAX_SIZE; } }
+         canvas.width = w; canvas.height = h;
+         const ctx = canvas.getContext('2d');
+         ctx.drawImage(img, 0, 0, w, h);
+         const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+         setSavedImages(prev => {
+           const next = [...prev, dataUrl];
+           localStorage.setItem('dnd-saved-images', JSON.stringify(next));
+           return next;
+         });
+       };
+       img.src = event.target.result;
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
   };
 
   const applyImage = () => {
@@ -488,13 +510,41 @@ export default function DMMapEditor() {
             <h3>{isEditingExisting ? 'Edit Hex Image' : 'New Region Image'}</h3>
             <p>{isEditingExisting ? 'Update the image for this region.' : 'Add an image to unlock this new region.'}</p>
             <div className="input-group">
-              <label>Upload File (Max 256x256 auto-compress)</label>
-              <input type="file" accept="image/*" onChange={handleImageUpload} />
+              <label>Image URL</label>
+              <input type="text" placeholder="https://..." value={imageUrl} onChange={e => setImageUrl(e.target.value)} />
             </div>
             <div className="input-group">
-              <label>Or Image URL</label>
-              <input type="text" placeholder="https://..." value={imageUrl} onChange={e => { setImageUrl(e.target.value); setImageFile(null); }} />
+              <label>Or Upload File (Auto-compressed to 256x256)</label>
+              <input type="file" accept="image/*" onChange={handleImageUpload} />
             </div>
+
+            <div className="library-header">
+              <h4>My Saved Library</h4>
+              <div className="library-upload-btn-wrap">
+                <button className="library-upload-btn">Upload & Save</button>
+                <input type="file" accept="image/*" onChange={handleAddToLibrary} />
+              </div>
+            </div>
+            {savedImages.length > 0 ? (
+              <div className="library-gallery">
+                {savedImages.map((src, idx) => (
+                  <div key={idx} className={`library-item ${imageUrl === src ? 'selected' : ''}`} onClick={() => setImageUrl(src)}>
+                    <img src={src} alt="saved" />
+                    <button className="library-item-delete" onClick={(e) => {
+                      e.stopPropagation();
+                      setSavedImages(prev => {
+                        const next = prev.filter((_, i) => i !== idx);
+                        localStorage.setItem('dnd-saved-images', JSON.stringify(next));
+                        return next;
+                      });
+                    }}>✕</button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p style={{ marginTop: '12px', fontSize: '0.75rem', color: '#888' }}>No saved images yet. Upload some to use them across campaigns!</p>
+            )}
+
             <div className="action-buttons">
               <button className="primary-btn" onClick={applyImage}>
                 <span>{isEditingExisting ? 'Apply Changes' : 'Apply & Unlock'}</span>
