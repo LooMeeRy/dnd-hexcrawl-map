@@ -111,6 +111,25 @@ export default function DMMapEditor() {
     return () => clearInterval(interval);
   }, [roomCode]);
 
+  // Handle DM leaving the page or closing the tab
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (mqttClient && roomCode) {
+        mqttClient.publish(`dnd-room/${roomCode}/closed`, 'closed');
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      if (mqttClient && roomCode) {
+        mqttClient.publish(`dnd-room/${roomCode}/closed`, 'closed');
+        // We do not call mqttClient.end() here because if the user just clicked stopOnline, 
+        // the client is already ended. Just publishing is safe enough.
+      }
+    };
+  }, [mqttClient, roomCode]);
+
   const stopOnline = () => {
     if (!mqttClient) return;
     // Tell players the room is closed
