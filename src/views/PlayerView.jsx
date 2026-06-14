@@ -179,12 +179,15 @@ export default function PlayerView() {
     localStorage.setItem(`dnd-player-image-${campaignId}`, playerImage);
     setSetupModalOpen(false);
     if (mqttClientRef.current) {
+       const myExistingToken = playerTokens[myPlayerId];
+       const q = myExistingToken ? myExistingToken.q : 0;
+       const r = myExistingToken ? myExistingToken.r : 0;
        mqttClientRef.current.publish(`dnd-room/${roomCode}/action`, JSON.stringify({ 
          type: 'add_player_token', 
          playerId: myPlayerId, 
          name: playerName, 
          image: playerImage,
-         q: 0, r: 0 // Default spawn position, DM can move it later
+         q, r
        }));
     }
   };
@@ -281,7 +284,7 @@ export default function PlayerView() {
             <button onClick={() => {
               setSetupModalOpen(true);
               setContextMenu({ ...contextMenu, visible: false });
-            }}>Change Token Image</button>
+            }}>Edit Character Profile</button>
           )}
         </div>
       )}
