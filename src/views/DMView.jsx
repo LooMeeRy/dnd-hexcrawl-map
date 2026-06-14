@@ -62,8 +62,8 @@ export default function DMView() {
                 <p style={{ margin: 0, fontSize: '0.85rem' }}>Created: {new Date(c.createdAt).toLocaleDateString()}</p>
               </div>
               <div style={{ display: 'flex', gap: '12px' }}>
-                <button className="primary-btn" onClick={() => navigate(`/dm/map/${c.id}`)}>Open</button>
-                <button style={{ padding: '10px 16px', borderRadius: '12px', border: '1px solid rgba(255,85,85,0.3)', background: 'transparent', color: '#ff5555', cursor: 'pointer', fontWeight: 600 }} onClick={() => deleteCampaign(c.id)}>Delete</button>
+                <button style={{ padding: '10px 16px', borderRadius: '12px', border: 'none', background: 'white', color: '#121212', cursor: 'pointer', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => navigate(`/dm/map/${c.id}`)}>Open</button>
+                <button style={{ padding: '10px 16px', borderRadius: '12px', border: '1px solid rgba(255,85,85,0.3)', background: 'transparent', color: '#ff5555', cursor: 'pointer', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => deleteCampaign(c.id)}>Delete</button>
               </div>
             </div>
           ))}
