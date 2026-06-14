@@ -97,6 +97,7 @@ export default function DMMapEditor() {
       client.subscribe(`dnd-room/${code}/ping`);
       client.subscribe(`dnd-room/${code}/action`);
       
+      client.publish(`dnd-room/${code}/info`, JSON.stringify({ campaignId }));
       client.publish(`dnd-room/${code}/map`, JSON.stringify(activeHexesRef.current));
       client.publish(`dnd-room/${code}/tokens`, JSON.stringify({ players: playerTokensRef.current, dmTokens: dmTokensRef.current }));
     });
@@ -105,6 +106,7 @@ export default function DMMapEditor() {
     
     client.on('message', (topic, message) => {
       if (topic === `dnd-room/${code}/request`) {
+        client.publish(`dnd-room/${code}/info`, JSON.stringify({ campaignId }));
         client.publish(`dnd-room/${code}/map`, JSON.stringify(activeHexesRef.current));
         client.publish(`dnd-room/${code}/tokens`, JSON.stringify({ players: playerTokensRef.current, dmTokens: dmTokensRef.current }));
       }

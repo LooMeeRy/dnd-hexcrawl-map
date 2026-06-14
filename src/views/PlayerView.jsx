@@ -21,14 +21,15 @@ export default function PlayerView() {
   
   const [cameraTarget, setCameraTarget] = useState({ q: 0, r: 0 });
   const [status, setStatus] = useState(roomCode ? 'Connecting...' : 'Local Sync (This Computer Only)');
+  const [campaignId, setCampaignId] = useState(null);
   
   const [mqttClient, setMqttClient] = useState(null);
   const [contextMenu, setContextMenu] = useState({ visible: false, type: 'hex', x: 0, y: 0, q: 0, r: 0, targetId: null });
 
   // Player Identity
   const [setupModalOpen, setSetupModalOpen] = useState(false);
-  const [playerName, setPlayerName] = useState(() => localStorage.getItem('dnd-player-name') || "");
-  const [playerImage, setPlayerImage] = useState(() => localStorage.getItem('dnd-player-image') || null);
+  const [playerName, setPlayerName] = useState("");
+  const [playerImage, setPlayerImage] = useState(null);
   const [myPlayerId] = useState(() => {
     let pid = localStorage.getItem('dnd-player-id');
     if (!pid) { pid = Math.random().toString(36).substring(2, 9); localStorage.setItem('dnd-player-id', pid); }
@@ -65,6 +66,7 @@ export default function PlayerView() {
     let pingInterval;
     
     client.on('connect', () => {
+      client.subscribe(`dnd-room/${roomCode}/info`);
       client.subscribe(`dnd-room/${roomCode}/map`);
       client.subscribe(`dnd-room/${roomCode}/tokens`);
       client.subscribe(`dnd-room/${roomCode}/closed`);
@@ -80,19 +82,6 @@ export default function PlayerView() {
         clearInterval(pingInterval);
         client.end();
       }, 4000);
-      
-      // Check if player needs to setup token
-      if (!localStorage.getItem('dnd-player-name') || !localStorage.getItem('dnd-player-image')) {
-        setSetupModalOpen(true);
-      } else {
-        // Broadcast identity so DM knows we are here
-        client.publish(`dnd-room/${roomCode}/action`, JSON.stringify({ 
-          type: 'add_player_token', 
-          playerId: myPlayerId, 
-          name: localStorage.getItem('dnd-player-name'), 
-          image: localStorage.getItem('dnd-player-image') 
-        }));
-      }
     });
     
     client.on('message', (topic, message) => {
@@ -100,6 +89,13 @@ export default function PlayerView() {
         setStatus('DM has closed this room.');
         setActiveHexes({}); setPlayerTokens({}); setDmTokens({});
         client.end(); return;
+      }
+      
+      if (topic === `dnd-room/${roomCode}/info`) {
+        try {
+           const info = JSON.parse(message.toString());
+           if (info.campaignId) setCampaignId(info.campaignId);
+        } catch (e) {}
       }
       
       if (topic === `dnd-room/${roomCode}/map`) {
@@ -127,7 +123,27 @@ export default function PlayerView() {
       if (pingInterval) clearInterval(pingInterval);
       client.end();
     };
-  }, [roomCode]);
+  }, [roomCode, myPlayerId]);
+
+  useEffect(() => {
+    if (!campaignId) return;
+    const storedName = localStorage.getItem(`dnd-player-name-${campaignId}`);
+    const storedImage = localStorage.getItem(`dnd-player-image-${campaignId}`);
+    if (!storedName || !storedImage) {
+      setSetupModalOpen(true);
+    } else {
+      setPlayerName(storedName);
+      setPlayerImage(storedImage);
+      if (mqttClientRef.current) {
+        mqttClientRef.current.publish(`dnd-room/${roomCode}/action`, JSON.stringify({ 
+          type: 'add_player_token', 
+          playerId: myPlayerId, 
+          name: storedName, 
+          image: storedImage 
+        }));
+      }
+    }
+  }, [campaignId, roomCode, myPlayerId]);
 
   useEffect(() => {
     const handleClick = () => setContextMenu(prev => ({ ...prev, visible: false }));
@@ -158,8 +174,8 @@ export default function PlayerView() {
 
   const completeSetup = () => {
     if (!playerName || !playerImage) return alert("Please provide a name and token image");
-    localStorage.setItem('dnd-player-name', playerName);
-    localStorage.setItem('dnd-player-image', playerImage);
+    localStorage.setItem(`dnd-player-name-${campaignId}`, playerName);
+    localStorage.setItem(`dnd-player-image-${campaignId}`, playerImage);
     setSetupModalOpen(false);
     if (mqttClientRef.current) {
        mqttClientRef.current.publish(`dnd-room/${roomCode}/action`, JSON.stringify({ 
