@@ -163,13 +163,17 @@ export default function PlayerView() {
     if (!roomCode) return;
     e.preventDefault(); e.stopPropagation();
     setCameraTarget({ q, r });
-    setContextMenu({ visible: true, type: 'hex', x: e.clientX, y: e.clientY, q, r });
+    const hexPos = getHexPixel(q, r);
+    setContextMenu({ visible: true, type: 'hex', gridX: hexPos.x + 20, gridY: hexPos.y, q, r });
   };
   
   const handlePlayerTokenContextMenu = (e, id) => {
     if (!roomCode || id !== myPlayerId) return;
     e.preventDefault(); e.stopPropagation();
-    setContextMenu({ visible: true, type: 'player_token', x: e.clientX, y: e.clientY, targetId: id });
+    const currentCenter = getHexPixel(cameraTarget.q, cameraTarget.r);
+    const gridX = e.clientX - window.innerWidth / 2 + currentCenter.x;
+    const gridY = e.clientY - window.innerHeight / 2 + currentCenter.y;
+    setContextMenu({ visible: true, type: 'player_token', gridX, gridY, targetId: id });
   };
 
   const handleTokenImageUpload = (e) => {
@@ -270,27 +274,26 @@ export default function PlayerView() {
               });
             }
           })}
+          {contextMenu.visible && (
+            <div className="context-menu" style={{ position: 'absolute', left: contextMenu.gridX, top: contextMenu.gridY, zIndex: 1000 }} onClick={(e) => e.stopPropagation()}>
+              {contextMenu.type === 'hex' && (
+                <button onClick={() => {
+                  if (mqttClient) {
+                     mqttClient.publish(`dnd-room/${roomCode}/action`, JSON.stringify({ type: 'move_player', playerId: myPlayerId, q: contextMenu.q, r: contextMenu.r }));
+                  }
+                  setContextMenu({ ...contextMenu, visible: false });
+                }}>Move My Token Here</button>
+              )}
+              {contextMenu.type === 'player_token' && (
+                <button onClick={() => {
+                  setSetupModalOpen(true);
+                  setContextMenu({ ...contextMenu, visible: false });
+                }}>Edit Character Profile</button>
+              )}
+            </div>
+          )}
         </div>
       </div>
-
-      {contextMenu.visible && (
-        <div className="context-menu" style={{ left: contextMenu.x, top: contextMenu.y }} onClick={(e) => e.stopPropagation()}>
-          {contextMenu.type === 'hex' && (
-            <button onClick={() => {
-              if (mqttClient) {
-                 mqttClient.publish(`dnd-room/${roomCode}/action`, JSON.stringify({ type: 'move_player', playerId: myPlayerId, q: contextMenu.q, r: contextMenu.r }));
-              }
-              setContextMenu({ ...contextMenu, visible: false });
-            }}>Move My Token Here</button>
-          )}
-          {contextMenu.type === 'player_token' && (
-            <button onClick={() => {
-              setSetupModalOpen(true);
-              setContextMenu({ ...contextMenu, visible: false });
-            }}>Edit Character Profile</button>
-          )}
-        </div>
-      )}
 
       {/* Setup Modal */}
       <div className={`image-modal ${setupModalOpen ? '' : 'hidden'}`}>

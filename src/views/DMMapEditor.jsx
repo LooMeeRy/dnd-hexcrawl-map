@@ -210,15 +210,26 @@ export default function DMMapEditor() {
   const handleActiveHexContextMenu = (e, q, r) => {
     e.preventDefault(); e.stopPropagation();
     setCameraTarget({ q, r });
-    setContextMenu({ visible: true, type: 'hex', x: e.clientX, y: e.clientY, q, r });
+    const centerPos = getHexPixel(q, r); // we are about to move the camera here
+    // Wait, if we use e.clientX and the CURRENT centerPos, it works perfectly.
+    // Actually, centerPos state hasn't updated yet! 
+    // We should just use the exact Hex coordinate!
+    const hexPos = getHexPixel(q, r);
+    setContextMenu({ visible: true, type: 'hex', gridX: hexPos.x + 20, gridY: hexPos.y, q, r });
   };
   const handleDmTokenContextMenu = (e, id) => {
     e.preventDefault(); e.stopPropagation();
-    setContextMenu({ visible: true, type: 'dm_token', x: e.clientX, y: e.clientY, targetId: id });
+    const t = dmTokens[id];
+    setContextMenu({ visible: true, type: 'dm_token', gridX: t.x + 30, gridY: t.y, targetId: id });
   };
   const handlePlayerTokenContextMenu = (e, id) => {
     e.preventDefault(); e.stopPropagation();
-    setContextMenu({ visible: true, type: 'player_token', x: e.clientX, y: e.clientY, targetId: id });
+    // For player token, we can estimate position from mouse using current centerPos
+    // We must use the OLD cameraTarget because setCameraTarget hasn't re-rendered yet.
+    const currentCenter = getHexPixel(cameraTarget.q, cameraTarget.r);
+    const gridX = e.clientX - window.innerWidth / 2 + currentCenter.x;
+    const gridY = e.clientY - window.innerHeight / 2 + currentCenter.y;
+    setContextMenu({ visible: true, type: 'player_token', gridX, gridY, targetId: id });
   };
 
   // --- Map Editor Logic ---
@@ -423,52 +434,52 @@ export default function DMMapEditor() {
               });
             }
           })}
+          {/* Context Menu Rendered Inside Grid */}
+          {contextMenu.visible && (
+            <div className="context-menu" style={{ position: 'absolute', left: contextMenu.gridX, top: contextMenu.gridY, zIndex: 1000 }} onClick={(e) => e.stopPropagation()}>
+              {contextMenu.type === 'hex' && (
+                <>
+                  {movingPlayerTokenId && (
+                    <button style={{ color: '#55ff55' }} onClick={() => {
+                      setPlayerTokens(prev => ({ ...prev, [movingPlayerTokenId]: { ...prev[movingPlayerTokenId], q: contextMenu.q, r: contextMenu.r } }));
+                      setMovingPlayerTokenId(null);
+                      setContextMenu({ ...contextMenu, visible: false });
+                    }}>Move Selected Player Here</button>
+                  )}
+                  <button onClick={() => { setMarkerCoord({ q: contextMenu.q, r: contextMenu.r }); setMarkerModalOpen(true); setContextMenu({ ...contextMenu, visible: false }); }}>Add DM Marker</button>
+                  <button onClick={() => { setTargetCoord({ q: contextMenu.q, r: contextMenu.r }); setIsEditingExisting(true); setImageUrl(""); setImageFile(null); setModalOpen(true); setContextMenu({ ...contextMenu, visible: false }); }}>Change Map Image</button>
+                  <button className="danger-menu-item" onClick={() => { handleDeleteHex(); setContextMenu({ ...contextMenu, visible: false }); }}>Delete Zone</button>
+                </>
+              )}
+              {contextMenu.type === 'dm_token' && (
+                <>
+                  <button onClick={() => {
+                    setDmTokens(prev => {
+                      const t = prev[contextMenu.targetId];
+                      return { ...prev, [contextMenu.targetId]: { ...t, size: (t.size || 64) * 1.25 } };
+                    });
+                  }}>Increase Size (+)</button>
+                  <button onClick={() => {
+                    setDmTokens(prev => {
+                      const t = prev[contextMenu.targetId];
+                      return { ...prev, [contextMenu.targetId]: { ...t, size: Math.max(16, (t.size || 64) * 0.8) } };
+                    });
+                  }}>Decrease Size (-)</button>
+                  <button className="danger-menu-item" onClick={() => {
+                    const nt = {...dmTokens}; delete nt[contextMenu.targetId]; setDmTokens(nt);
+                    setContextMenu({ ...contextMenu, visible: false });
+                  }}>Delete Marker</button>
+                </>
+              )}
+              {contextMenu.type === 'player_token' && (
+                <>
+                  <button onClick={() => { setMovingPlayerTokenId(contextMenu.targetId); setContextMenu({ ...contextMenu, visible: false }); }}>Move Player</button>
+                </>
+              )}
+            </div>
+          )}
         </div>
       </div>
-
-      {contextMenu.visible && (
-        <div className="context-menu" style={{ left: contextMenu.x, top: contextMenu.y }} onClick={(e) => e.stopPropagation()}>
-          {contextMenu.type === 'hex' && (
-            <>
-              {movingPlayerTokenId && (
-                <button style={{ color: '#55ff55' }} onClick={() => {
-                  setPlayerTokens(prev => ({ ...prev, [movingPlayerTokenId]: { ...prev[movingPlayerTokenId], q: contextMenu.q, r: contextMenu.r } }));
-                  setMovingPlayerTokenId(null);
-                  setContextMenu({ ...contextMenu, visible: false });
-                }}>Move Selected Player Here</button>
-              )}
-              <button onClick={() => { setMarkerCoord({ q: contextMenu.q, r: contextMenu.r }); setMarkerModalOpen(true); setContextMenu({ ...contextMenu, visible: false }); }}>Add DM Marker</button>
-              <button onClick={() => { setTargetCoord({ q: contextMenu.q, r: contextMenu.r }); setIsEditingExisting(true); setImageUrl(""); setImageFile(null); setModalOpen(true); setContextMenu({ ...contextMenu, visible: false }); }}>Change Map Image</button>
-              <button className="danger-menu-item" onClick={() => { handleDeleteHex(); setContextMenu({ ...contextMenu, visible: false }); }}>Delete Zone</button>
-            </>
-          )}
-          {contextMenu.type === 'dm_token' && (
-            <>
-              <button onClick={() => {
-                setDmTokens(prev => {
-                  const t = prev[contextMenu.targetId];
-                  return { ...prev, [contextMenu.targetId]: { ...t, size: (t.size || 64) * 1.25 } };
-                });
-              }}>Increase Size (+)</button>
-              <button onClick={() => {
-                setDmTokens(prev => {
-                  const t = prev[contextMenu.targetId];
-                  return { ...prev, [contextMenu.targetId]: { ...t, size: Math.max(16, (t.size || 64) * 0.8) } };
-                });
-              }}>Decrease Size (-)</button>
-              <button className="danger-menu-item" onClick={() => {
-                const nt = {...dmTokens}; delete nt[contextMenu.targetId]; setDmTokens(nt);
-                setContextMenu({ ...contextMenu, visible: false });
-              }}>Delete Marker</button>
-            </>
-          )}
-          {contextMenu.type === 'player_token' && (
-            <>
-              <button onClick={() => { setMovingPlayerTokenId(contextMenu.targetId); setContextMenu({ ...contextMenu, visible: false }); }}>Move Player</button>
-            </>
-          )}
-        </div>
-      )}
 
       {/* Hex Image Modal */}
       <div className={`image-modal ${modalOpen ? '' : 'hidden'}`}>
