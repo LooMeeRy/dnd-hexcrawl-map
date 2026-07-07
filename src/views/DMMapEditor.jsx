@@ -37,6 +37,14 @@ export default function DMMapEditor() {
     const saved = localStorage.getItem(`dnd-dmtokens-${campaignId}`);
     return saved ? JSON.parse(saved) : {};
   });
+  const [persistentPings, setPersistentPings] = useState(() => {
+    const saved = localStorage.getItem(`dnd-persistent-pings-${campaignId}`);
+    return saved ? JSON.parse(saved) : {};
+  });
+  const [activePings, setActivePings] = useState([]);
+  const [pingMode, setPingMode] = useState('none');
+  const [dmPingColor, setDmPingColor] = useState('#ff5555');
+  const [dmPingSpeed, setDmPingSpeed] = useState('2s');
 
   const [modalOpen, setModalOpen] = useState(false);
   const [targetCoord, setTargetCoord] = useState(null);
@@ -73,17 +81,19 @@ export default function DMMapEditor() {
     localStorage.setItem(`dnd-map-${campaignId}`, JSON.stringify(activeHexes));
     localStorage.setItem(`dnd-players-${campaignId}`, JSON.stringify(playerTokens));
     localStorage.setItem(`dnd-dmtokens-${campaignId}`, JSON.stringify(dmTokens));
+    localStorage.setItem(`dnd-persistent-pings-${campaignId}`, JSON.stringify(persistentPings));
     
     // Master sync file for Local mode
     localStorage.setItem('dnd-map-local-sync', JSON.stringify(activeHexes));
     localStorage.setItem('dnd-players-local-sync', JSON.stringify(playerTokens));
     localStorage.setItem('dnd-dmtokens-local-sync', JSON.stringify(dmTokens));
+    localStorage.setItem('dnd-persistent-pings-local-sync', JSON.stringify(persistentPings));
     
     if (mqttClient && roomCode) {
       mqttClient.publish(`dnd-room/${roomCode}/map`, JSON.stringify(activeHexes));
-      mqttClient.publish(`dnd-room/${roomCode}/tokens`, JSON.stringify({ players: playerTokens, dmTokens }));
+      mqttClient.publish(`dnd-room/${roomCode}/tokens`, JSON.stringify({ players: playerTokens, dmTokens, persistentPings }));
     }
-  }, [activeHexes, playerTokens, dmTokens, mqttClient, roomCode, campaignId]);
+  }, [activeHexes, playerTokens, dmTokens, persistentPings, mqttClient, roomCode, campaignId]);
 
   const startOnline = () => {
     if (mqttClient || isConnecting) return;
@@ -120,6 +130,12 @@ export default function DMMapEditor() {
       if (topic === `dnd-room/${code}/action`) {
         try {
           const action = JSON.parse(message.toString());
+          if (action.type === 'ping') {
+             const newPing = { id: Date.now() + Math.random(), q: action.q, r: action.r, color: action.color || '#ff5555' };
+             setActivePings(prev => [...prev, newPing]);
+             setTimeout(() => { setActivePings(prev => prev.filter(p => p.id !== newPing.id)); }, 1000);
+             client.publish(`dnd-room/${code}/events`, JSON.stringify(action)); // Broadcast back to all players
+          }
           if (action.type === 'add_player_token' || action.type === 'change_player_image') {
             setPlayerTokens(prev => {
               const existing = prev[action.playerId] || {};
@@ -129,6 +145,7 @@ export default function DMMapEditor() {
                   ...existing, 
                   image: action.image, 
                   name: action.name, 
+                  color: action.color,
                   q: action.q !== undefined ? action.q : (existing.q !== undefined ? existing.q : 0), 
                   r: action.r !== undefined ? action.r : (existing.r !== undefined ? existing.r : 0) 
                 } 
@@ -387,6 +404,35 @@ export default function DMMapEditor() {
         )}
       </div>
 
+      {/* DM Ping Controls */}
+      <div className="ping-controls">
+        <h4>DM Ping Tools</h4>
+        <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+          <div style={{ flex: 1 }}>
+            <label style={{ fontSize: '0.75rem', color: '#888', display: 'block' }}>Color</label>
+            <input type="color" value={dmPingColor} onChange={e => setDmPingColor(e.target.value)} style={{ width: '100%', height: '32px', border: 'none', background: 'transparent', cursor: 'pointer' }} />
+          </div>
+          <div style={{ flex: 1 }}>
+            <label style={{ fontSize: '0.75rem', color: '#888', display: 'block' }}>Speed</label>
+            <select value={dmPingSpeed} onChange={e => setDmPingSpeed(e.target.value)} style={{ width: '100%', height: '32px', background: '#222', color: 'white', border: 'none', padding: '4px', borderRadius: '4px' }}>
+              <option value="0.5s">Fast (0.5s)</option>
+              <option value="1s">Normal (1s)</option>
+              <option value="2s">Slow (2s)</option>
+              <option value="4s">Very Slow (4s)</option>
+            </select>
+          </div>
+        </div>
+        <button className={`ping-mode-btn ${pingMode === 'normal' ? 'active' : ''}`} onClick={() => setPingMode(pingMode === 'normal' ? 'none' : 'normal')}>
+          📍 Normal Ping (or Alt+Click)
+        </button>
+        <button className={`ping-mode-btn ${pingMode === 'force_focus' ? 'active' : ''}`} onClick={() => setPingMode(pingMode === 'force_focus' ? 'none' : 'force_focus')}>
+          🎥 Force Camera Focus
+        </button>
+        <button className={`ping-mode-btn ${pingMode === 'persistent' ? 'active' : ''}`} onClick={() => setPingMode(pingMode === 'persistent' ? 'none' : 'persistent')}>
+          🔥 Persistent Ping (Click to place/remove)
+        </button>
+      </div>
+
       <div className="hex-grid-container">
         <div className="hex-grid" style={{ transform: `translate(${-centerPos.x}px, ${-centerPos.y}px)` }}>
           {/* Hexes */}
@@ -396,7 +442,35 @@ export default function DMMapEditor() {
               <div 
                 key={`active-${hex.q}-${hex.r}`} className="hex-wrap hex-active"
                 style={{ left: pos.x, top: pos.y, backgroundImage: hex.image ? `url(${hex.image})` : 'none', zIndex: 1 }}
-                onClick={() => setCameraTarget({ q: hex.q, r: hex.r })}
+                onClick={(e) => {
+                  if (e.altKey || pingMode !== 'none') {
+                    const mode = e.altKey && pingMode === 'none' ? 'normal' : pingMode;
+                    const q = hex.q; const r = hex.r;
+                    
+                    if (mode === 'normal') {
+                       const newPing = { id: Date.now() + Math.random(), q, r, color: dmPingColor };
+                       setActivePings(prev => [...prev, newPing]);
+                       setTimeout(() => { setActivePings(prev => prev.filter(p => p.id !== newPing.id)); }, 1000);
+                       if (mqttClient && roomCode) mqttClient.publish(`dnd-room/${roomCode}/events`, JSON.stringify({ type: 'ping', q, r, color: dmPingColor }));
+                    } else if (mode === 'force_focus') {
+                       const newPing = { id: Date.now() + Math.random(), q, r, color: dmPingColor };
+                       setActivePings(prev => [...prev, newPing]);
+                       setTimeout(() => { setActivePings(prev => prev.filter(p => p.id !== newPing.id)); }, 1000);
+                       if (mqttClient && roomCode) mqttClient.publish(`dnd-room/${roomCode}/events`, JSON.stringify({ type: 'force_focus', q, r, color: dmPingColor }));
+                    } else if (mode === 'persistent') {
+                       const key = `${q},${r}`;
+                       setPersistentPings(prev => {
+                          const next = {...prev};
+                          if (next[key]) delete next[key];
+                          else next[key] = { q, r, color: dmPingColor, speed: dmPingSpeed };
+                          return next;
+                       });
+                    }
+                    if (!e.altKey) setPingMode('none');
+                  } else {
+                    setCameraTarget({ q: hex.q, r: hex.r });
+                  }
+                }}
                 onContextMenu={(e) => handleActiveHexContextMenu(e, hex.q, hex.r)}
               />
             );
@@ -438,7 +512,7 @@ export default function DMMapEditor() {
               return (
                 <div key={t.id} style={{ position: 'absolute', left: pos.x, top: pos.y, transform: 'translate(-50%, -50%)', zIndex: 20 }}
                      onContextMenu={e => handlePlayerTokenContextMenu(e, t.id)}>
-                  <img src={t.image} title={t.name} width={64} height={64} style={{ borderRadius: '50%', border: '3px solid gold', pointerEvents: 'none', objectFit: 'cover', background: '#222' }} />
+                  <img src={t.image} title={t.name} width={64} height={64} style={{ borderRadius: '50%', border: `3px solid ${t.color || 'gold'}`, pointerEvents: 'none', objectFit: 'cover', background: '#222' }} />
                 </div>
               );
             } else {
@@ -450,12 +524,31 @@ export default function DMMapEditor() {
                 return (
                   <div key={t.id} style={{ position: 'absolute', left: cx, top: cy, transform: 'translate(-50%, -50%)', zIndex: 20 }}
                        onContextMenu={e => handlePlayerTokenContextMenu(e, t.id)}>
-                    <img src={t.image} title={t.name} width={48} height={48} style={{ borderRadius: '50%', border: '3px solid gold', pointerEvents: 'none', objectFit: 'cover', background: '#222' }} />
+                    <img src={t.image} title={t.name} width={48} height={48} style={{ borderRadius: '50%', border: `3px solid ${t.color || 'gold'}`, pointerEvents: 'none', objectFit: 'cover', background: '#222' }} />
                   </div>
                 );
               });
             }
           })}
+
+          {/* Active Pings */}
+          {activePings.map(p => {
+             const pos = getHexPixel(p.q, p.r);
+             return <div key={p.id} className="ping-circle" style={{ left: pos.x, top: pos.y, '--ping-color': p.color }} />
+          })}
+
+          {/* Persistent Pings */}
+          {Object.entries(persistentPings).map(([key, p]) => {
+             const [q, r] = key.split(',').map(Number);
+             const pos = getHexPixel(q, r);
+             return (
+               <React.Fragment key={`pp-${key}`}>
+                 <div className="persistent-ping" style={{ left: pos.x, top: pos.y, '--ping-color': p.color, '--ping-speed': p.speed || '2s' }} />
+                 <div className="persistent-ping-core" style={{ left: pos.x, top: pos.y, '--ping-color': p.color }} />
+               </React.Fragment>
+             );
+          })}
+          
           {/* Context Menu Rendered Inside Grid */}
           {contextMenu.visible && (
             <div className="context-menu" style={{ position: 'absolute', left: contextMenu.gridX, top: contextMenu.gridY, zIndex: 1000 }} onClick={(e) => e.stopPropagation()}>

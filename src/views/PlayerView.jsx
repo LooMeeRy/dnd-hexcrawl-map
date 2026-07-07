@@ -19,6 +19,8 @@ export default function PlayerView() {
   const [activeHexes, setActiveHexes] = useState({});
   const [playerTokens, setPlayerTokens] = useState({});
   const [dmTokens, setDmTokens] = useState({});
+  const [persistentPings, setPersistentPings] = useState({});
+  const [activePings, setActivePings] = useState([]);
   
   const [cameraTarget, setCameraTarget] = useState({ q: 0, r: 0 });
   const [hasFocused, setHasFocused] = useState(false);
@@ -33,6 +35,7 @@ export default function PlayerView() {
   const [setupModalOpen, setSetupModalOpen] = useState(false);
   const [playerName, setPlayerName] = useState("");
   const [playerImage, setPlayerImage] = useState(null);
+  const [playerColor, setPlayerColor] = useState("#55ff55");
   const [myPlayerId] = useState(() => {
     let pid = localStorage.getItem('dnd-player-id');
     if (!pid) { pid = Math.random().toString(36).substring(2, 9); localStorage.setItem('dnd-player-id', pid); }
@@ -47,11 +50,13 @@ export default function PlayerView() {
       if (e.key === 'dnd-map-local-sync' && e.newValue) setActiveHexes(JSON.parse(e.newValue));
       if (e.key === 'dnd-players-local-sync' && e.newValue) setPlayerTokens(JSON.parse(e.newValue));
       if (e.key === 'dnd-dmtokens-local-sync' && e.newValue) setDmTokens(JSON.parse(e.newValue));
+      if (e.key === 'dnd-persistent-pings-local-sync' && e.newValue) setPersistentPings(JSON.parse(e.newValue));
     };
     
     const m = localStorage.getItem('dnd-map-local-sync'); if (m) setActiveHexes(JSON.parse(m));
     const p = localStorage.getItem('dnd-players-local-sync'); if (p) setPlayerTokens(JSON.parse(p));
     const d = localStorage.getItem('dnd-dmtokens-local-sync'); if (d) setDmTokens(JSON.parse(d));
+    const pp = localStorage.getItem('dnd-persistent-pings-local-sync'); if (pp) setPersistentPings(JSON.parse(pp));
     
     window.addEventListener('storage', handleStorage);
     return () => window.removeEventListener('storage', handleStorage);
@@ -72,6 +77,7 @@ export default function PlayerView() {
       client.subscribe(`dnd-room/${roomCode}/info`);
       client.subscribe(`dnd-room/${roomCode}/map`);
       client.subscribe(`dnd-room/${roomCode}/tokens`);
+      client.subscribe(`dnd-room/${roomCode}/events`);
       client.subscribe(`dnd-room/${roomCode}/closed`);
       
       client.publish(`dnd-room/${roomCode}/request`, 'hello');
@@ -112,7 +118,20 @@ export default function PlayerView() {
           const data = JSON.parse(message.toString());
           if (data.players) setPlayerTokens(data.players);
           if (data.dmTokens) setDmTokens(data.dmTokens);
+          if (data.persistentPings) setPersistentPings(data.persistentPings);
         } catch (e) {}
+      }
+      
+      if (topic === `dnd-room/${roomCode}/events`) {
+        try {
+          const event = JSON.parse(message.toString());
+          if (event.type === 'ping' || event.type === 'force_focus') {
+            const newPing = { id: Date.now() + Math.random(), q: event.q, r: event.r, color: event.color || '#ff5555' };
+            setActivePings(prev => [...prev, newPing]);
+            setTimeout(() => { setActivePings(prev => prev.filter(p => p.id !== newPing.id)); }, 1000);
+            if (event.type === 'force_focus') setCameraTarget({ q: event.q, r: event.r });
+          }
+        } catch(e) {}
       }
     });
     
@@ -132,17 +151,20 @@ export default function PlayerView() {
     if (!campaignId) return;
     const storedName = localStorage.getItem(`dnd-player-name-${campaignId}`);
     const storedImage = localStorage.getItem(`dnd-player-image-${campaignId}`);
+    const storedColor = localStorage.getItem(`dnd-player-color-${campaignId}`) || "#55ff55";
     if (!storedName || !storedImage) {
       setSetupModalOpen(true);
     } else {
       setPlayerName(storedName);
       setPlayerImage(storedImage);
+      setPlayerColor(storedColor);
       if (mqttClientRef.current) {
         mqttClientRef.current.publish(`dnd-room/${roomCode}/action`, JSON.stringify({ 
           type: 'add_player_token', 
           playerId: myPlayerId, 
           name: storedName, 
-          image: storedImage 
+          image: storedImage,
+          color: storedColor
         }));
       }
     }
@@ -226,13 +248,15 @@ export default function PlayerView() {
     if (!playerName || !playerImage) return alert("Please provide a name and token image");
     localStorage.setItem(`dnd-player-name-${campaignId}`, playerName);
     localStorage.setItem(`dnd-player-image-${campaignId}`, playerImage);
+    localStorage.setItem(`dnd-player-color-${campaignId}`, playerColor);
     setSetupModalOpen(false);
     if (mqttClientRef.current) {
        mqttClientRef.current.publish(`dnd-room/${roomCode}/action`, JSON.stringify({ 
          type: 'add_player_token', 
          playerId: myPlayerId, 
          name: playerName, 
-         image: playerImage
+         image: playerImage,
+         color: playerColor
        }));
     }
   };
@@ -282,7 +306,18 @@ export default function PlayerView() {
                 key={`memory-${hex.q}-${hex.r}`} 
                 className={`hex-wrap hex-active ${fogClass}`}
                 style={{ left: pos.x, top: pos.y, backgroundImage: hex.image ? `url(${hex.image})` : 'none', zIndex: 1 }}
-                onClick={() => setCameraTarget({ q: hex.q, r: hex.r })}
+                onClick={(e) => {
+                  if (e.altKey && mqttClient) {
+                     mqttClient.publish(`dnd-room/${roomCode}/action`, JSON.stringify({ type: 'ping', q: hex.q, r: hex.r, color: playerColor }));
+                  } else if (e.altKey && !roomCode) {
+                     // Local mode basic ping
+                     const newPing = { id: Date.now() + Math.random(), q: hex.q, r: hex.r, color: playerColor };
+                     setActivePings(prev => [...prev, newPing]);
+                     setTimeout(() => { setActivePings(prev => prev.filter(p => p.id !== newPing.id)); }, 1000);
+                  } else {
+                     setCameraTarget({ q: hex.q, r: hex.r });
+                  }
+                }}
                 onContextMenu={(e) => handleActiveHexContextMenu(e, hex.q, hex.r)}
               />
             );
@@ -315,7 +350,7 @@ export default function PlayerView() {
               return (
                 <div key={t.id} style={{ position: 'absolute', left: pos.x, top: pos.y, transform: 'translate(-50%, -50%)', zIndex: 20 }}
                      onContextMenu={e => handlePlayerTokenContextMenu(e, t.id)}>
-                  <img src={t.image} title={t.name} width={64} height={64} style={{ borderRadius: '50%', border: t.id === myPlayerId ? '3px solid #55ff55' : '3px solid gold', pointerEvents: 'none', objectFit: 'cover', background: '#222' }} />
+                  <img src={t.image} title={t.name} width={64} height={64} style={{ borderRadius: '50%', border: `3px solid ${t.color || '#55ff55'}`, pointerEvents: 'none', objectFit: 'cover', background: '#222', boxShadow: t.id === myPlayerId ? `0 0 12px ${t.color || '#55ff55'}` : 'none' }} />
                 </div>
               );
             } else {
@@ -327,12 +362,31 @@ export default function PlayerView() {
                 return (
                   <div key={t.id} style={{ position: 'absolute', left: cx, top: cy, transform: 'translate(-50%, -50%)', zIndex: 20 }}
                        onContextMenu={e => handlePlayerTokenContextMenu(e, t.id)}>
-                    <img src={t.image} title={t.name} width={48} height={48} style={{ borderRadius: '50%', border: t.id === myPlayerId ? '3px solid #55ff55' : '3px solid gold', pointerEvents: 'none', objectFit: 'cover', background: '#222' }} />
+                    <img src={t.image} title={t.name} width={48} height={48} style={{ borderRadius: '50%', border: `3px solid ${t.color || '#55ff55'}`, pointerEvents: 'none', objectFit: 'cover', background: '#222', boxShadow: t.id === myPlayerId ? `0 0 12px ${t.color || '#55ff55'}` : 'none' }} />
                   </div>
                 );
               });
             }
           })}
+
+          {/* Active Pings */}
+          {activePings.map(p => {
+             const pos = getHexPixel(p.q, p.r);
+             return <div key={p.id} className="ping-circle" style={{ left: pos.x, top: pos.y, '--ping-color': p.color }} />
+          })}
+
+          {/* Persistent Pings */}
+          {Object.entries(persistentPings).map(([key, p]) => {
+             const [q, r] = key.split(',').map(Number);
+             const pos = getHexPixel(q, r);
+             return (
+               <React.Fragment key={`pp-${key}`}>
+                 <div className="persistent-ping" style={{ left: pos.x, top: pos.y, '--ping-color': p.color, '--ping-speed': p.speed || '2s' }} />
+                 <div className="persistent-ping-core" style={{ left: pos.x, top: pos.y, '--ping-color': p.color }} />
+               </React.Fragment>
+             );
+          })}
+          
           {contextMenu.visible && (
             <div className="context-menu" style={{ position: 'absolute', left: contextMenu.gridX, top: contextMenu.gridY, zIndex: 1000 }} onClick={(e) => e.stopPropagation()}>
               {contextMenu.type === 'hex' && (
@@ -368,9 +422,13 @@ export default function PlayerView() {
               <label>Token Image (Auto-compress)</label>
               <input type="file" accept="image/*" onChange={handleTokenImageUpload} />
             </div>
+            <div className="input-group">
+              <label>Signature Color (Border & Ping)</label>
+              <input type="color" value={playerColor} onChange={e => setPlayerColor(e.target.value)} style={{ width: '100%', height: '40px', border: 'none', background: 'transparent', cursor: 'pointer' }} />
+            </div>
             {playerImage && (
                <div style={{ textAlign: 'center', marginBottom: '24px' }}>
-                 <img src={playerImage} width={80} height={80} style={{ borderRadius: '50%', border: '3px solid #55ff55', objectFit: 'cover' }} />
+                 <img src={playerImage} width={80} height={80} style={{ borderRadius: '50%', border: `3px solid ${playerColor}`, objectFit: 'cover', boxShadow: `0 0 16px ${playerColor}` }} />
                </div>
             )}
             <div className="action-buttons">
