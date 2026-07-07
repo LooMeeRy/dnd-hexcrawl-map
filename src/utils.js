@@ -17,3 +17,22 @@ export const compressTokenImage = (file, callback) => {
     };
     reader.readAsDataURL(file);
 };
+
+export function getHexDistance(q1, r1, q2, r2) {
+  return (Math.abs(q1 - q2) + Math.abs(q1 + r1 - q2 - r2) + Math.abs(r1 - r2)) / 2;
+}
+
+export function pixelToHex(x, y, hexSize = 80) {
+  const q = (Math.sqrt(3)/3 * x - 1/3 * y) / hexSize;
+  const r = (2/3 * y) / hexSize;
+  const s = -q - r;
+  let rq = Math.round(q);
+  let rr = Math.round(r);
+  let rs = Math.round(s);
+  const q_diff = Math.abs(rq - q);
+  const r_diff = Math.abs(rr - r);
+  const s_diff = Math.abs(rs - s);
+  if (q_diff > r_diff && q_diff > s_diff) rq = -rr - rs;
+  else if (r_diff > s_diff) rr = -rq - rs;
+  return { q: rq, r: rr };
+};

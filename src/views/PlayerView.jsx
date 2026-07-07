@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import mqtt from 'mqtt';
-import { compressTokenImage } from '../utils';
+import { compressTokenImage, getHexDistance, pixelToHex } from '../utils';
 
 const HEX_SIZE = 80;
 
@@ -24,6 +24,7 @@ export default function PlayerView() {
   const [hasFocused, setHasFocused] = useState(false);
   const [status, setStatus] = useState(roomCode ? 'Connecting...' : 'Local Sync (This Computer Only)');
   const [campaignId, setCampaignId] = useState(null);
+  const [memoryMap, setMemoryMap] = useState({});
   
   const [mqttClient, setMqttClient] = useState(null);
   const [contextMenu, setContextMenu] = useState({ visible: false, type: 'hex', x: 0, y: 0, q: 0, r: 0, targetId: null });
@@ -145,7 +146,44 @@ export default function PlayerView() {
         }));
       }
     }
+    try { const saved = localStorage.getItem(`dnd-memory-map-${campaignId}`); if (saved) setMemoryMap(JSON.parse(saved)); } catch (e) {}
   }, [campaignId, roomCode, myPlayerId]);
+
+  useEffect(() => {
+    setMemoryMap(prev => {
+      const next = { ...prev };
+      let hasChanges = false;
+      const visionTokens = roomCode ? (playerTokens[myPlayerId] ? [playerTokens[myPlayerId]] : []) : Object.values(playerTokens);
+      
+      // Update memory for active hexes
+      Object.values(activeHexes).forEach(hex => {
+        let minD = Infinity;
+        if (visionTokens.length === 0) { minD = roomCode ? Infinity : 0; }
+        else { visionTokens.forEach(t => { const d = getHexDistance(t.q, t.r, hex.q, hex.r); if (d < minD) minD = d; }); }
+        if (minD <= 2) {
+          const key = `${hex.q},${hex.r}`;
+          if (!next[key] || next[key].image !== hex.image) { next[key] = { ...hex }; hasChanges = true; }
+        }
+      });
+
+      // Clear memory for removed hexes that are within sight
+      Object.values(next).forEach(memHex => {
+        const key = `${memHex.q},${memHex.r}`;
+        if (!activeHexes[key]) {
+          let minD = Infinity;
+          if (visionTokens.length === 0) { minD = roomCode ? Infinity : 0; }
+          else { visionTokens.forEach(t => { const d = getHexDistance(t.q, t.r, memHex.q, memHex.r); if (d < minD) minD = d; }); }
+          if (minD <= 2) { delete next[key]; hasChanges = true; }
+        }
+      });
+
+      if (hasChanges) {
+        if (campaignId) localStorage.setItem(`dnd-memory-map-${campaignId}`, JSON.stringify(next));
+        return next;
+      }
+      return prev;
+    });
+  }, [activeHexes, playerTokens, myPlayerId, roomCode, campaignId]);
 
   useEffect(() => {
     if (!roomCode || hasFocused || !playerTokens[myPlayerId]) return;
@@ -226,12 +264,23 @@ export default function PlayerView() {
 
       <div className="hex-grid-container">
         <div className="hex-grid" style={{ transform: `translate(${-centerPos.x}px, ${-centerPos.y}px)` }}>
-          {hexesList.map(hex => {
+          {Object.values(memoryMap).map(hex => {
             const pos = getHexPixel(hex.q, hex.r);
+            
+            let minD = Infinity;
+            const visionTokens = roomCode ? (playerTokens[myPlayerId] ? [playerTokens[myPlayerId]] : []) : Object.values(playerTokens);
+            if (visionTokens.length === 0) minD = roomCode ? Infinity : 0;
+            else visionTokens.forEach(t => { const d = getHexDistance(t.q, t.r, hex.q, hex.r); if (d < minD) minD = d; });
+            
+            let fogClass = 'fog-heavy';
+            if (minD === 0) fogClass = 'fog-clear';
+            else if (minD === 1) fogClass = 'fog-light';
+            else if (minD === 2) fogClass = 'fog-medium';
+            
             return (
               <div 
-                key={`active-${hex.q}-${hex.r}`} 
-                className="hex-wrap hex-active"
+                key={`memory-${hex.q}-${hex.r}`} 
+                className={`hex-wrap hex-active ${fogClass}`}
                 style={{ left: pos.x, top: pos.y, backgroundImage: hex.image ? `url(${hex.image})` : 'none', zIndex: 1 }}
                 onClick={() => setCameraTarget({ q: hex.q, r: hex.r })}
                 onContextMenu={(e) => handleActiveHexContextMenu(e, hex.q, hex.r)}
@@ -240,11 +289,21 @@ export default function PlayerView() {
           })}
 
           {/* DM Tokens */}
-          {Object.entries(dmTokens).map(([id, t]) => (
-            <div key={id} style={{ position: 'absolute', left: t.x, top: t.y, transform: 'translate(-50%, -50%)', zIndex: 10 }}>
-              <img src={t.image} width={t.size || 64} height={t.size || 64} style={{ borderRadius: '50%', border: '2px dashed rgba(255,85,85,0.8)', pointerEvents: 'none', objectFit: 'cover' }} />
-            </div>
-          ))}
+          {Object.entries(dmTokens).map(([id, t]) => {
+            const h = pixelToHex(t.x, t.y);
+            let minD = Infinity;
+            const visionTokens = roomCode ? (playerTokens[myPlayerId] ? [playerTokens[myPlayerId]] : []) : Object.values(playerTokens);
+            if (visionTokens.length === 0) minD = roomCode ? Infinity : 0;
+            else visionTokens.forEach(pt => { const d = getHexDistance(pt.q, pt.r, h.q, h.r); if (d < minD) minD = d; });
+            
+            if (minD >= 3) return null;
+            
+            return (
+              <div key={id} style={{ position: 'absolute', left: t.x, top: t.y, transform: 'translate(-50%, -50%)', zIndex: 10 }}>
+                <img src={t.image} width={t.size || 64} height={t.size || 64} style={{ borderRadius: '50%', border: '2px dashed rgba(255,85,85,0.8)', pointerEvents: 'none', objectFit: 'cover' }} />
+              </div>
+            );
+          })}
 
           {/* Player Tokens */}
           {Object.entries(playerGroups).flatMap(([key, tokens]) => {
