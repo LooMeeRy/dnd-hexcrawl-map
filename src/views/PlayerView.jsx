@@ -58,8 +58,28 @@ export default function PlayerView() {
     const d = localStorage.getItem('dnd-dmtokens-local-sync'); if (d) setDmTokens(JSON.parse(d));
     const pp = localStorage.getItem('dnd-persistent-pings-local-sync'); if (pp) setPersistentPings(JSON.parse(pp));
     
+    const handleStoragePing = (e) => {
+      if (e.key === 'dnd-local-ping' && e.newValue) {
+        const ping = JSON.parse(e.newValue);
+        const pid = Date.now()+Math.random();
+        setActivePings(prev => [...prev, { id: pid, q: ping.q, r: ping.r, color: ping.color }]);
+        setTimeout(() => setActivePings(prev => prev.filter(p => p.id !== pid)), 1000);
+      }
+      if (e.key === 'dnd-local-force-focus' && e.newValue) {
+        const event = JSON.parse(e.newValue);
+        const pid = Date.now()+Math.random();
+        setActivePings(prev => [...prev, { id: pid, q: event.q, r: event.r, color: event.color }]);
+        setTimeout(() => setActivePings(prev => prev.filter(p => p.id !== pid)), 1000);
+        setCameraTarget({ q: event.q, r: event.r });
+      }
+    };
+    
     window.addEventListener('storage', handleStorage);
-    return () => window.removeEventListener('storage', handleStorage);
+    window.addEventListener('storage', handleStoragePing);
+    return () => {
+       window.removeEventListener('storage', handleStorage);
+       window.removeEventListener('storage', handleStoragePing);
+    }
   }, [roomCode]);
 
   useEffect(() => {
@@ -307,13 +327,16 @@ export default function PlayerView() {
                 className={`hex-wrap hex-active ${fogClass}`}
                 style={{ left: pos.x, top: pos.y, backgroundImage: hex.image ? `url(${hex.image})` : 'none', zIndex: 1 }}
                 onClick={(e) => {
-                  if (e.altKey && mqttClient) {
-                     mqttClient.publish(`dnd-room/${roomCode}/action`, JSON.stringify({ type: 'ping', q: hex.q, r: hex.r, color: playerColor }));
-                  } else if (e.altKey && !roomCode) {
-                     // Local mode basic ping
-                     const newPing = { id: Date.now() + Math.random(), q: hex.q, r: hex.r, color: playerColor };
-                     setActivePings(prev => [...prev, newPing]);
-                     setTimeout(() => { setActivePings(prev => prev.filter(p => p.id !== newPing.id)); }, 1000);
+                  if (e.altKey) {
+                     const pid = Date.now() + Math.random();
+                     setActivePings(prev => [...prev, { id: pid, q: hex.q, r: hex.r, color: playerColor }]);
+                     setTimeout(() => setActivePings(prev => prev.filter(p => p.id !== pid)), 1000);
+                     
+                     if (mqttClientRef.current && roomCode) {
+                        mqttClientRef.current.publish(`dnd-room/${roomCode}/action`, JSON.stringify({ type: 'ping', q: hex.q, r: hex.r, color: playerColor }));
+                     } else {
+                        localStorage.setItem('dnd-local-ping', JSON.stringify({ q: hex.q, r: hex.r, color: playerColor, _t: Date.now() }));
+                     }
                   } else {
                      setCameraTarget({ q: hex.q, r: hex.r });
                   }
@@ -382,7 +405,6 @@ export default function PlayerView() {
              return (
                <React.Fragment key={`pp-${key}`}>
                  <div className="persistent-ping" style={{ left: pos.x, top: pos.y, '--ping-color': p.color, '--ping-speed': p.speed || '2s' }} />
-                 <div className="persistent-ping-core" style={{ left: pos.x, top: pos.y, '--ping-color': p.color }} />
                </React.Fragment>
              );
           })}

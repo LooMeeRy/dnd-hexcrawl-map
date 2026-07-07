@@ -71,10 +71,12 @@ export default function DMMapEditor() {
   const activeHexesRef = useRef(activeHexes);
   const playerTokensRef = useRef(playerTokens);
   const dmTokensRef = useRef(dmTokens);
+  const persistentPingsRef = useRef(persistentPings);
 
   useEffect(() => { activeHexesRef.current = activeHexes; }, [activeHexes]);
   useEffect(() => { playerTokensRef.current = playerTokens; }, [playerTokens]);
   useEffect(() => { dmTokensRef.current = dmTokens; }, [dmTokens]);
+  useEffect(() => { persistentPingsRef.current = persistentPings; }, [persistentPings]);
 
   // Save to Local Storage & MQTT Publish Maps + Tokens
   useEffect(() => {
@@ -121,7 +123,7 @@ export default function DMMapEditor() {
       if (topic === `dnd-room/${code}/request`) {
         client.publish(`dnd-room/${code}/info`, JSON.stringify({ campaignId }));
         client.publish(`dnd-room/${code}/map`, JSON.stringify(activeHexesRef.current));
-        client.publish(`dnd-room/${code}/tokens`, JSON.stringify({ players: playerTokensRef.current, dmTokens: dmTokensRef.current }));
+        client.publish(`dnd-room/${code}/tokens`, JSON.stringify({ players: playerTokensRef.current, dmTokens: dmTokensRef.current, persistentPings: persistentPingsRef.current }));
       }
       if (topic === `dnd-room/${code}/ping`) {
         const pid = message.toString();
@@ -219,6 +221,19 @@ export default function DMMapEditor() {
     });
     return Object.values(ghosts);
   }, [activeHexes]);
+
+  useEffect(() => {
+    const handleStorage = (e) => {
+      if (e.key === 'dnd-local-ping' && e.newValue) {
+        const ping = JSON.parse(e.newValue);
+        const pid = Date.now()+Math.random();
+        setActivePings(prev => [...prev, { id: pid, q: ping.q, r: ping.r, color: ping.color }]);
+        setTimeout(() => setActivePings(prev => prev.filter(p => p.id !== pid)), 1000);
+      }
+    };
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
+  }, []);
 
   useEffect(() => {
     const handleClick = () => setContextMenu(prev => ({ ...prev, visible: false }));
@@ -457,11 +472,13 @@ export default function DMMapEditor() {
                        setActivePings(prev => [...prev, newPing]);
                        setTimeout(() => { setActivePings(prev => prev.filter(p => p.id !== newPing.id)); }, 1000);
                        if (mqttClient && roomCode) mqttClient.publish(`dnd-room/${roomCode}/events`, JSON.stringify({ type: 'ping', q, r, color: dmPingColor }));
+                       localStorage.setItem('dnd-local-ping', JSON.stringify({ q, r, color: dmPingColor, _t: Date.now() }));
                     } else if (mode === 'force_focus') {
                        const newPing = { id: Date.now() + Math.random(), q, r, color: dmPingColor };
                        setActivePings(prev => [...prev, newPing]);
                        setTimeout(() => { setActivePings(prev => prev.filter(p => p.id !== newPing.id)); }, 1000);
                        if (mqttClient && roomCode) mqttClient.publish(`dnd-room/${roomCode}/events`, JSON.stringify({ type: 'force_focus', q, r, color: dmPingColor }));
+                       localStorage.setItem('dnd-local-force-focus', JSON.stringify({ q, r, color: dmPingColor, _t: Date.now() }));
                     } else if (mode === 'persistent') {
                        const key = `${q},${r}`;
                        setPersistentPings(prev => {
@@ -549,7 +566,6 @@ export default function DMMapEditor() {
              return (
                <React.Fragment key={`pp-${key}`}>
                  <div className="persistent-ping" style={{ left: pos.x, top: pos.y, '--ping-color': p.color, '--ping-speed': p.speed || '2s' }} />
-                 <div className="persistent-ping-core" style={{ left: pos.x, top: pos.y, '--ping-color': p.color }} />
                </React.Fragment>
              );
           })}
