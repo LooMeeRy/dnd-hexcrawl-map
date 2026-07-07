@@ -358,4 +358,27 @@ button:active { transform: scale(0.96); }
 .ping-tool-btn.speed-btn { width: auto; padding: 0 16px; border-radius: 20px; font-size: 0.85rem; font-weight: 600; letter-spacing: 0.05em; color: #bbb; }
 .ping-tool-btn.speed-btn:hover { color: #fff; }
 
+/* Minimalist Fog Toggle Switch */
+.fog-toggle-btn {
+  display: flex; align-items: center; gap: 8px;
+  background: rgba(15, 15, 15, 0.85); backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 9999px;
+  padding: 6px 12px 6px 6px; cursor: pointer; transition: all 0.3s ease;
+  color: #888; font-size: 0.8rem; font-weight: 500; letter-spacing: 0.02em;
+}
+.fog-toggle-btn:hover { background: rgba(255, 255, 255, 0.05); color: #ccc; }
+.fog-toggle-btn.active { color: #fff; border-color: rgba(255, 255, 255, 0.2); }
+
+.fog-toggle-icon {
+  width: 24px; height: 24px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.fog-toggle-btn.active .fog-toggle-icon {
+  background: rgba(255, 255, 255, 0.15); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.2); color: #fff;
+}
+.fog-toggle-btn:not(.active) .fog-toggle-icon {
+  background: rgba(0, 0, 0, 0.3); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05); color: #888;
+}
+
 
