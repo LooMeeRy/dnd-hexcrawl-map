@@ -566,6 +566,26 @@ export default function DMMapEditor() {
              return (
                <React.Fragment key={`pp-${key}`}>
                  <div className="persistent-ping" style={{ left: pos.x, top: pos.y, '--ping-color': p.color, '--ping-speed': p.speed || '2s' }} />
+                 {pingMode === 'persistent' && (
+                   <div style={{
+                     position: 'absolute', left: pos.x, top: pos.y, transform: 'translate(-50%, -50%)',
+                     zIndex: 105, cursor: 'pointer', background: 'rgba(255,85,85,0.95)',
+                     color: 'white', borderRadius: '50%', width: '32px', height: '32px',
+                     display: 'flex', alignItems: 'center', justifyContent: 'center',
+                     boxShadow: '0 4px 12px rgba(0,0,0,0.5)', border: '2px solid rgba(255,255,255,0.8)'
+                   }} 
+                   title="Click to remove this ping"
+                   onClick={(e) => {
+                       e.stopPropagation();
+                       setPersistentPings(prev => {
+                          const next = {...prev};
+                          delete next[key];
+                          return next;
+                       });
+                   }}>
+                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                   </div>
+                 )}
                </React.Fragment>
              );
           })}
