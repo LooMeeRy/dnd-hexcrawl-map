@@ -27,6 +27,7 @@ export default function PlayerView() {
   const [status, setStatus] = useState(roomCode ? 'Connecting...' : 'Local Sync (This Computer Only)');
   const [campaignId, setCampaignId] = useState(null);
   const [memoryMap, setMemoryMap] = useState({});
+  const [fogEnabled, setFogEnabled] = useState(true);
   
   const [mqttClient, setMqttClient] = useState(null);
   const [contextMenu, setContextMenu] = useState({ visible: false, type: 'hex', x: 0, y: 0, q: 0, r: 0, targetId: null });
@@ -296,25 +297,45 @@ export default function PlayerView() {
     <div className="app-container">
       <div className="bg-glow"></div>
       
-      <div className="app-header">
-        <button className="status-badge" style={{ cursor: 'pointer', color: '#aaa', background: 'transparent', border: 'none' }} onClick={() => navigate('/')}>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 18l-6-6 6-6"/></svg>
-        </button>
-        <div className="status-badge">Player View {playerName && `(${playerName})`}</div>
-        <div className={`status-badge ${roomCode && status.includes('Connected') ? 'online' : ''}`}>
-          {status}
+      <div className="app-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '12px' }}>
+          <button className="status-badge" style={{ cursor: 'pointer', color: '#aaa', background: 'transparent', border: 'none' }} onClick={() => navigate('/')}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 18l-6-6 6-6"/></svg>
+          </button>
+          <div className="status-badge" style={{ color: roomCode ? '#55ff55' : 'gold' }}>
+            {status}
+          </div>
+          {roomCode && (
+             <div className="status-badge">
+               Room: {roomCode}
+             </div>
+          )}
         </div>
+        
+        {!roomCode && (
+          <button 
+             className="status-badge" 
+             style={{ cursor: 'pointer', background: 'rgba(25,25,25,0.9)', color: fogEnabled ? '#ccc' : '#fff', border: `1px solid ${fogEnabled ? 'rgba(255,255,255,0.1)' : 'rgba(85,255,85,0.5)'}` }} 
+             onClick={() => setFogEnabled(!fogEnabled)}
+          >
+            {fogEnabled ? '🌫️ Fog of War: ON' : '🌞 Fog of War: OFF'}
+          </button>
+        )}
       </div>
 
       <div className="hex-grid-container">
         <div className="hex-grid" style={{ transform: `translate(${-centerPos.x}px, ${-centerPos.y}px)` }}>
-          {Object.values(memoryMap).map(hex => {
+          {(fogEnabled ? Object.values(memoryMap) : Object.values(activeHexes)).map(hex => {
             const pos = getHexPixel(hex.q, hex.r);
             
             let minD = Infinity;
-            const visionTokens = roomCode ? (playerTokens[myPlayerId] ? [playerTokens[myPlayerId]] : []) : Object.values(playerTokens);
-            if (visionTokens.length === 0) minD = roomCode ? Infinity : 0;
-            else visionTokens.forEach(t => { const d = getHexDistance(t.q, t.r, hex.q, hex.r); if (d < minD) minD = d; });
+            if (!fogEnabled) {
+               minD = 0;
+            } else {
+               const visionTokens = roomCode ? (playerTokens[myPlayerId] ? [playerTokens[myPlayerId]] : []) : Object.values(playerTokens);
+               if (visionTokens.length === 0) minD = roomCode ? Infinity : 0;
+               else visionTokens.forEach(t => { const d = getHexDistance(t.q, t.r, hex.q, hex.r); if (d < minD) minD = d; });
+            }
             
             let fogClass = 'fog-heavy';
             if (minD === 0) fogClass = 'fog-clear';
@@ -350,9 +371,13 @@ export default function PlayerView() {
           {Object.entries(dmTokens).map(([id, t]) => {
             const h = pixelToHex(t.x, t.y);
             let minD = Infinity;
-            const visionTokens = roomCode ? (playerTokens[myPlayerId] ? [playerTokens[myPlayerId]] : []) : Object.values(playerTokens);
-            if (visionTokens.length === 0) minD = roomCode ? Infinity : 0;
-            else visionTokens.forEach(pt => { const d = getHexDistance(pt.q, pt.r, h.q, h.r); if (d < minD) minD = d; });
+            if (!fogEnabled) {
+               minD = 0;
+            } else {
+               const visionTokens = roomCode ? (playerTokens[myPlayerId] ? [playerTokens[myPlayerId]] : []) : Object.values(playerTokens);
+               if (visionTokens.length === 0) minD = roomCode ? Infinity : 0;
+               else visionTokens.forEach(pt => { const d = getHexDistance(pt.q, pt.r, h.q, h.r); if (d < minD) minD = d; });
+            }
             
             if (minD >= 3) return null;
             
