@@ -404,33 +404,38 @@ export default function DMMapEditor() {
         )}
       </div>
 
-      {/* DM Ping Controls */}
-      <div className="ping-controls">
-        <h4>DM Ping Tools</h4>
-        <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
-          <div style={{ flex: 1 }}>
-            <label style={{ fontSize: '0.75rem', color: '#888', display: 'block' }}>Color</label>
-            <input type="color" value={dmPingColor} onChange={e => setDmPingColor(e.target.value)} style={{ width: '100%', height: '32px', border: 'none', background: 'transparent', cursor: 'pointer' }} />
-          </div>
-          <div style={{ flex: 1 }}>
-            <label style={{ fontSize: '0.75rem', color: '#888', display: 'block' }}>Speed</label>
-            <select value={dmPingSpeed} onChange={e => setDmPingSpeed(e.target.value)} style={{ width: '100%', height: '32px', background: '#222', color: 'white', border: 'none', padding: '4px', borderRadius: '4px' }}>
-              <option value="0.5s">Fast (0.5s)</option>
-              <option value="1s">Normal (1s)</option>
-              <option value="2s">Slow (2s)</option>
-              <option value="4s">Very Slow (4s)</option>
-            </select>
-          </div>
-        </div>
-        <button className={`ping-mode-btn ${pingMode === 'normal' ? 'active' : ''}`} onClick={() => setPingMode(pingMode === 'normal' ? 'none' : 'normal')}>
-          📍 Normal Ping (or Alt+Click)
-        </button>
-        <button className={`ping-mode-btn ${pingMode === 'force_focus' ? 'active' : ''}`} onClick={() => setPingMode(pingMode === 'force_focus' ? 'none' : 'force_focus')}>
-          🎥 Force Camera Focus
-        </button>
-        <button className={`ping-mode-btn ${pingMode === 'persistent' ? 'active' : ''}`} onClick={() => setPingMode(pingMode === 'persistent' ? 'none' : 'persistent')}>
-          🔥 Persistent Ping (Click to place/remove)
-        </button>
+      {/* DM Ping Minimal Toolbar */}
+      <div className="ping-toolbar">
+         <div className="ping-tool-item color-picker-wrap" title="Ping Color">
+            <div className="color-swatch" style={{ background: dmPingColor }}></div>
+            <input type="color" value={dmPingColor} onChange={e => setDmPingColor(e.target.value)} />
+         </div>
+         
+         <div className="toolbar-divider" />
+         
+         <button className={`ping-tool-btn ${pingMode === 'normal' ? 'active' : ''}`} onClick={() => setPingMode(pingMode === 'normal' ? 'none' : 'normal')} title="Normal Ping (or Alt+Click)">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>
+         </button>
+         
+         <button className={`ping-tool-btn ${pingMode === 'force_focus' ? 'active' : ''}`} onClick={() => setPingMode(pingMode === 'force_focus' ? 'none' : 'force_focus')} title="Force Camera Focus">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+         </button>
+         
+         <button className={`ping-tool-btn ${pingMode === 'persistent' ? 'active' : ''}`} onClick={() => setPingMode(pingMode === 'persistent' ? 'none' : 'persistent')} title="Persistent Ping (Click map to place/remove)">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h.01"/><path d="M8.5 16.429a5 5 0 0 1 7 0"/><path d="M5.671 13.522a9 9 0 0 1 12.658 0"/><path d="M2.843 10.615a13 13 0 0 1 18.314 0"/></svg>
+         </button>
+
+         {pingMode === 'persistent' && (
+           <>
+             <div className="toolbar-divider" />
+             <button className="ping-tool-btn speed-btn" onClick={() => {
+                const speeds = ['0.5s', '1s', '2s', '4s'];
+                setDmPingSpeed(speeds[(speeds.indexOf(dmPingSpeed) + 1) % speeds.length]);
+             }} title="Toggle Pulse Speed">
+               {dmPingSpeed}
+             </button>
+           </>
+         )}
       </div>
 
       <div className="hex-grid-container">
