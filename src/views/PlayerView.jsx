@@ -513,7 +513,8 @@ export default function PlayerView() {
         playerColor={playerColor} 
         playerName={playerName || 'Player'} 
         onRollBroadcast={handleRollBroadcast} 
-        incomingRoll={incomingRoll} 
+        incomingRoll={incomingRoll}
+        hideControls={true}
       />
       
     </div>

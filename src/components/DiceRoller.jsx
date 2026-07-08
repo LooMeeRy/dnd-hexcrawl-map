@@ -3,7 +3,7 @@ import DiceBox from '@3d-dice/dice-box';
 import { GiD4, GiDiceSixFacesSix, GiDiceEightFacesEight, GiD10, GiD12, GiDiceTwentyFacesTwenty } from 'react-icons/gi';
 import { FaPercent } from 'react-icons/fa';
 
-export default function DiceRoller({ playerColor, playerName, onRollBroadcast, incomingRoll }) {
+export default function DiceRoller({ playerColor, playerName, onRollBroadcast, incomingRoll, hideControls }) {
   const containerRef = useRef(null);
   const diceBoxRef = useRef(null);
   
@@ -169,7 +169,7 @@ export default function DiceRoller({ playerColor, playerName, onRollBroadcast, i
         id={containerId.current}
         ref={containerRef} 
         style={{
-          position: 'absolute',
+          position: 'fixed',
           bottom: 0,
           right: 0,
           width: '50vw',
@@ -180,11 +180,12 @@ export default function DiceRoller({ playerColor, playerName, onRollBroadcast, i
       />
 
       {/* Pop-up Dice Tool */}
-      <div className="dice-tool-container" style={{ '--btn-color': playerColor || '#ff5555' }}>
-        
-        {/* Stack of Dice Buttons (Vertical) */}
-        {isOpen && (
-          <div className="dice-stack open">
+      {!hideControls && (
+        <div className="dice-tool-container" style={{ '--btn-color': playerColor || '#ff5555' }}>
+          
+          {/* Stack of Dice Buttons (Vertical) */}
+          {isOpen && (
+            <div className="dice-stack open">
             {diceTypes.map((type, index) => (
               <div 
                 key={type} 
@@ -232,6 +233,7 @@ export default function DiceRoller({ playerColor, playerName, onRollBroadcast, i
           {getDiceIcon('d20', 32)}
         </button>
       </div>
+      )}
 
       {/* Toast Notifications */}
       <div className="dice-toast-container">
