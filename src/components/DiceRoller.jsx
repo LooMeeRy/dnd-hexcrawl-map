@@ -1,5 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import DiceBox from '@3d-dice/dice-box';
+import { GiD4, GiDiceSixFacesSix, GiDiceEightFacesEight, GiD10, GiD12, GiDiceTwentyFacesTwenty } from 'react-icons/gi';
+import { FaPercent } from 'react-icons/fa';
 
 export default function DiceRoller({ playerColor, playerName, onRollBroadcast, incomingRoll }) {
   const containerRef = useRef(null);
@@ -119,15 +121,15 @@ export default function DiceRoller({ playerColor, playerName, onRollBroadcast, i
 
   const diceTypes = ['d4', 'd6', 'd8', 'd10', 'd12', 'd20', 'd100'];
 
-  const getDiceIcon = (type) => {
+  const getDiceIcon = (type, size = 26) => {
     switch (type) {
-      case 'd4': return <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.5"><polygon points="12 3 22 21 2 21 12 3"/></svg>;
-      case 'd6': return <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/></svg>;
-      case 'd8': return <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.5"><polygon points="12 2 22 12 12 22 2 12 12 2"/><line x1="2" y1="12" x2="22" y2="12"/></svg>;
-      case 'd10': return <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.5"><polygon points="12 2 20 10 12 22 4 10 12 2"/><line x1="12" y1="2" x2="12" y2="22"/></svg>;
-      case 'd12': return <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.5"><polygon points="12 2 20 8 17 20 7 20 4 8 12 2"/><line x1="12" y1="2" x2="12" y2="10"/><polygon points="12 10 18 13 15 19 9 19 6 13 12 10"/></svg>;
-      case 'd20': return <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" strokeWidth="1.5"><polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5 12 2"/><polygon points="12 22 12 14.5"/><polygon points="22 8.5 12 14.5 2 8.5"/><polygon points="12 2 12 14.5"/></svg>;
-      case 'd100': return <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="12" cy="12" r="10"/><text x="12" y="16.5" fontSize="10" textAnchor="middle" fill="currentColor" stroke="none" fontWeight="bold">%</text></svg>;
+      case 'd4': return <GiD4 size={size} />;
+      case 'd6': return <GiDiceSixFacesSix size={size} />;
+      case 'd8': return <GiDiceEightFacesEight size={size} />;
+      case 'd10': return <GiD10 size={size} />;
+      case 'd12': return <GiD12 size={size} />;
+      case 'd20': return <GiDiceTwentyFacesTwenty size={size} />;
+      case 'd100': return <FaPercent size={size - 4} />;
       default: return null;
     }
   };
@@ -210,7 +212,7 @@ export default function DiceRoller({ playerColor, playerName, onRollBroadcast, i
           }} 
           title="Dice Menu"
         >
-          {getDiceIcon('d20')}
+          {getDiceIcon('d20', 32)}
         </button>
       </div>
 
