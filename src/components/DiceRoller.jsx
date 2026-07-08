@@ -23,7 +23,7 @@ export default function DiceRoller({ playerColor, playerName, onRollBroadcast, i
       assetPath: '/assets/dice-box/', // must match the public folder path
       theme: 'default',
       themeColor: playerColor || '#ff5555',
-      scale: 14,
+      scale: 5,
       spinForce: 10,
       throwForce: 12,
       startingHeight: 14,
