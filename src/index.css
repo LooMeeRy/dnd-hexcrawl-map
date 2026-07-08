@@ -619,3 +619,21 @@ button:active { transform: scale(0.96); }
   0% { transform: translateY(-20px); opacity: 0; }
   100% { transform: translateY(0); opacity: 1; }
 }
+\n\n/* Fix for Dice Box Canvas Size */\n[id^="dice-box-"] canvas {\n  width: 100% !important;\n  height: 100% !important;\n}
+
+/* Force dice canvas to bottom right quadrant */
+.dice-canvas-container {
+  position: fixed !important;
+  bottom: 0 !important;
+  right: 0 !important;
+  width: 45vw !important;
+  height: 55vh !important;
+  pointer-events: none !important;
+  z-index: 900 !important;
+  /* border: 2px solid green; /* uncomment to debug */
+}
+.dice-canvas-container canvas {
+  width: 100% !important;
+  height: 100% !important;
+  outline: none !important;
+}

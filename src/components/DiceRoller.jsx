@@ -167,7 +167,8 @@ export default function DiceRoller({ playerColor, playerName, onRollBroadcast, i
       {/* 3D Dice Canvas Container */}
       <div 
         id={containerId.current}
-        ref={containerRef} 
+        ref={containerRef}
+        className="dice-canvas-container"
         style={{
           position: 'fixed',
           bottom: 0,
