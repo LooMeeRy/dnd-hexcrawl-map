@@ -390,7 +390,7 @@ button:active { transform: scale(0.96); }
   left: 24px;
   z-index: 950;
   display: flex;
-  flex-direction: column-reverse;
+  flex-direction: column;
   align-items: center;
   gap: 12px;
 }
