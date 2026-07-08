@@ -619,7 +619,12 @@ button:active { transform: scale(0.96); }
   0% { transform: translateY(-20px); opacity: 0; }
   100% { transform: translateY(0); opacity: 1; }
 }
-\n\n/* Fix for Dice Box Canvas Size */\n[id^="dice-box-"] canvas {\n  width: 100% !important;\n  height: 100% !important;\n}
+
+/* Fix for Dice Box Canvas Size */
+[id^="dice-box-"] canvas {
+  width: 100% !important;
+  height: 100% !important;
+}
 
 /* Force dice canvas to bottom right quadrant */
 .dice-canvas-container {
