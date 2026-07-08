@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import DiceBox from '@3d-dice/dice-box';
 import { GiD4, GiDiceSixFacesSix, GiDiceEightFacesEight, GiD10, GiD12, GiDiceTwentyFacesTwenty } from 'react-icons/gi';
-import { FaPercent } from 'react-icons/fa';
+import { FaPercent, FaPalette } from 'react-icons/fa';
 
 export default function DiceRoller({ playerColor, playerName, onRollBroadcast, incomingRoll, hideControls }) {
   const containerRef = useRef(null);
@@ -12,6 +12,9 @@ export default function DiceRoller({ playerColor, playerName, onRollBroadcast, i
   const [isRolling, setIsRolling] = useState(false);
   const [toasts, setToasts] = useState([]);
   
+  const [activeTheme, setActiveTheme] = useState('default');
+  const [isThemeMenuOpen, setIsThemeMenuOpen] = useState(false);
+  
   // Create a unique ID for the container so we can pass a CSS selector to DiceBox
   const containerId = useRef(`dice-box-${Math.random().toString(36).substr(2, 9)}`);
 
@@ -21,7 +24,7 @@ export default function DiceRoller({ playerColor, playerName, onRollBroadcast, i
     
     const box = new DiceBox(`#${containerId.current}`, {
       assetPath: '/assets/dice-box/', // must match the public folder path
-      theme: 'default',
+      theme: activeTheme,
       themeColor: playerColor || '#ff5555',
       scale: 5,
       spinForce: 10,
@@ -43,12 +46,15 @@ export default function DiceRoller({ playerColor, playerName, onRollBroadcast, i
     };
   }, []); // Init once
 
-  // Update theme color when it changes
+  // Update theme config when it changes
   useEffect(() => {
-    if (diceBoxRef.current && playerColor) {
-      diceBoxRef.current.updateConfig({ themeColor: playerColor });
+    if (diceBoxRef.current) {
+      const configObj = {};
+      if (playerColor) configObj.themeColor = playerColor;
+      if (activeTheme) configObj.theme = activeTheme;
+      diceBoxRef.current.updateConfig(configObj);
     }
-  }, [playerColor]);
+  }, [playerColor, activeTheme]);
 
   const localRollContext = useRef(null);
   const clearTimerRef = useRef(null);
@@ -153,10 +159,11 @@ export default function DiceRoller({ playerColor, playerName, onRollBroadcast, i
     setIsRolling(true);
     setIsOpen(false);
     setSelectedDice(null);
+    setIsThemeMenuOpen(false);
 
     const notation = `${nQty}${type}`;
     localRollContext.current = { notation, type, color: playerColor || '#ff5555' };
-    diceBoxRef.current.roll(notation, { themeColor: playerColor || '#ff5555' }).catch(e => {
+    diceBoxRef.current.roll(notation, { theme: activeTheme, themeColor: playerColor || '#ff5555' }).catch(e => {
         console.error("Roll error", e);
         setIsRolling(false);
     });
@@ -195,7 +202,7 @@ export default function DiceRoller({ playerColor, playerName, onRollBroadcast, i
               >
                 <button 
                   className={`dice-type-btn ${selectedDice === type ? 'active' : ''}`}
-                  onClick={() => setSelectedDice(selectedDice === type ? null : type)}
+                  onClick={() => { setSelectedDice(selectedDice === type ? null : type); setIsThemeMenuOpen(false); }}
                   title={`Roll ${type.toUpperCase()}`}
                 >
                   {getDiceIcon(type)}
@@ -219,6 +226,34 @@ export default function DiceRoller({ playerColor, playerName, onRollBroadcast, i
                 )}
               </div>
             ))}
+
+            {/* Theme Picker Button */}
+            <div className="dice-stack-item">
+              <button 
+                className={`dice-type-btn ${isThemeMenuOpen ? 'active' : ''}`}
+                onClick={() => { setIsThemeMenuOpen(!isThemeMenuOpen); setSelectedDice(null); }}
+                title="Change Theme"
+              >
+                <FaPalette size={22} />
+              </button>
+              
+              {/* Theme Pop-out (Horizontal to the right) */}
+              {isThemeMenuOpen && (
+                <div className="dice-qty-bar theme-picker-bar" style={{ gap: '6px' }}>
+                  {['default', 'rust', 'wooden', 'rock', 'gemstone'].map(t => (
+                    <button 
+                      key={t} 
+                      className={`qty-btn ${activeTheme === t ? 'active' : ''}`} 
+                      onClick={() => { setActiveTheme(t); setIsThemeMenuOpen(false); }}
+                      style={{ textTransform: 'capitalize', width: 'auto', padding: '0 12px', fontSize: '0.85rem' }}
+                    >
+                      {t}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
           </div>
         )}
 
@@ -227,7 +262,10 @@ export default function DiceRoller({ playerColor, playerName, onRollBroadcast, i
           className="dice-main-btn" 
           onClick={() => {
              setIsOpen(!isOpen);
-             if (isOpen) setSelectedDice(null);
+             if (isOpen) {
+               setSelectedDice(null);
+               setIsThemeMenuOpen(false);
+             }
           }} 
           title="Dice Menu"
         >
