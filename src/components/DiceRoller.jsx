@@ -13,7 +13,7 @@ export default function DiceRoller({ playerColor, playerName, onRollBroadcast, i
   const [toasts, setToasts] = useState([]);
   
   // Create a unique ID for the container so we can pass a CSS selector to DiceBox
-  const containerId = useRef(`dice-box-${Date.now()}-${Math.floor(Math.random() * 1000)}`);
+  const containerId = useRef(`dice-box-${Math.random().toString(36).substr(2, 9)}`);
 
   // Initialize DiceBox
   useEffect(() => {
@@ -23,7 +23,7 @@ export default function DiceRoller({ playerColor, playerName, onRollBroadcast, i
       assetPath: '/assets/dice-box/', // must match the public folder path
       theme: 'default',
       themeColor: playerColor || '#ff5555',
-      scale: 12,
+      scale: 14,
       spinForce: 10,
       throwForce: 12,
       startingHeight: 14,
@@ -118,7 +118,19 @@ export default function DiceRoller({ playerColor, playerName, onRollBroadcast, i
     if (incomingRoll && diceBoxRef.current) {
       const notation = incomingRoll.notation;
       localRollContext.current = null; // ensure it's marked as networked
-      diceBoxRef.current.roll(notation, { themeColor: incomingRoll.color });
+      
+      if (incomingRoll.results && incomingRoll.diceType) {
+        const sides = parseInt(incomingRoll.diceType.replace('d', '')) || 20;
+        const notationObj = incomingRoll.results.map(val => ({
+          sides: sides,
+          qty: 1,
+          value: val,
+          themeColor: incomingRoll.color || '#ff5555'
+        }));
+        diceBoxRef.current.roll(notationObj).catch(e => console.error("Remote roll error", e));
+      } else {
+        diceBoxRef.current.roll(notation, { themeColor: incomingRoll.color }).catch(e => console.error("Remote roll error", e));
+      }
     }
   }, [incomingRoll]);
 
@@ -171,7 +183,10 @@ export default function DiceRoller({ playerColor, playerName, onRollBroadcast, i
         ref={containerRef} 
         style={{
           position: 'absolute',
-          inset: 0,
+          bottom: 0,
+          right: 0,
+          width: '50vw',
+          height: '60vh',
           pointerEvents: 'none',
           zIndex: 900 // above map, below UI
         }}
