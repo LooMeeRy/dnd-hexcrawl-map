@@ -163,7 +163,7 @@ export default function DiceRoller({ playerColor, playerName, onRollBroadcast, i
 
     const notation = `${nQty}${type}`;
     localRollContext.current = { notation, type, color: playerColor || '#ff5555' };
-    diceBoxRef.current.roll(notation, { theme: activeTheme, themeColor: playerColor || '#ff5555' }).catch(e => {
+    diceBoxRef.current.roll(notation).catch(e => {
         console.error("Roll error", e);
         setIsRolling(false);
     });
