@@ -161,6 +161,12 @@ export default function DiceRoller({ playerColor, playerName, onRollBroadcast, i
     setSelectedDice(null);
     setIsThemeMenuOpen(false);
 
+    // Cancel any pending clear timer so it doesn't clear the dice mid-roll!
+    if (clearTimerRef.current) {
+      clearTimeout(clearTimerRef.current);
+      clearTimerRef.current = null;
+    }
+
     const notation = `${nQty}${type}`;
     localRollContext.current = { notation, type, color: playerColor || '#ff5555' };
     diceBoxRef.current.roll(notation).catch(e => {
