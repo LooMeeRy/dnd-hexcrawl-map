@@ -113,6 +113,10 @@ export default function DiceRoller({ playerColor, playerName, onRollBroadcast, i
     }, 6000);
   };
 
+  const [isOpen, setIsOpen] = useState(false);
+  const [selectedDice, setSelectedDice] = useState(null);
+  const [customQty, setCustomQty] = useState(6);
+
   const diceTypes = ['d4', 'd6', 'd8', 'd10', 'd12', 'd20', 'd100'];
 
   const getDiceIcon = (type) => {
