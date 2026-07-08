@@ -21,9 +21,11 @@ export default function DiceRoller({ playerColor, playerName, onRollBroadcast, i
       assetPath: '/assets/dice-box/', // must match the public folder path
       theme: 'default',
       themeColor: playerColor || '#ff5555',
-      scale: 9,
-      spinForce: 6,
-      throwForce: 6,
+      scale: 12,
+      spinForce: 10,
+      throwForce: 12,
+      startingHeight: 14,
+      restitution: 0.7,
       gravity: 3,
       mass: 2,
       friction: 0.8,
@@ -111,11 +113,16 @@ export default function DiceRoller({ playerColor, playerName, onRollBroadcast, i
     }, 6000);
   };
 
-  const handleRoll = () => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [selectedDice, setSelectedDice] = useState(null);
+  const [customQty, setCustomQty] = useState(6);
+
+  const handleRoll = (nQty, type) => {
     if (!diceBoxRef.current || isRolling) return;
     setIsRolling(true);
+    setIsOpen(false);
 
-    const notation = `${qty}${diceType}`;
+    const notation = `${nQty}${type}`;
     localRollContext.current = { notation, color: playerColor || '#ff5555' };
     diceBoxRef.current.roll(notation, { themeColor: playerColor || '#ff5555' }).catch(e => {
         console.error("Roll error", e);
@@ -137,38 +144,57 @@ export default function DiceRoller({ playerColor, playerName, onRollBroadcast, i
         }}
       />
 
-      {/* Dice UI Panel (Left side) */}
-      <div className="dice-ui-panel">
-        <h4>Roll Dice</h4>
-        <div className="dice-controls">
-          <input 
-            type="number" 
-            min="1" max="20" 
-            value={qty} 
-            onChange={(e) => setQty(Number(e.target.value))}
-            className="dice-qty-input"
-          />
-          <select 
-            value={diceType} 
-            onChange={(e) => setDiceType(e.target.value)}
-            className="dice-type-select"
-          >
-            <option value="d4">D4</option>
-            <option value="d6">D6</option>
-            <option value="d8">D8</option>
-            <option value="d10">D10</option>
-            <option value="d12">D12</option>
-            <option value="d20">D20</option>
-            <option value="d100">D100</option>
-          </select>
-        </div>
-        <button 
-          className="dice-roll-btn" 
-          onClick={handleRoll} 
-          disabled={isRolling}
-          style={{ '--btn-color': playerColor || '#ff5555' }}
-        >
-          {isRolling ? 'Rolling...' : 'ROLL'}
+      {/* Pop-up Dice Tool */}
+      <div className="dice-tool-container" style={{ '--btn-color': playerColor || '#ff5555' }}>
+        {isOpen && (
+          <div className="dice-tool-popup">
+            {!selectedDice ? (
+              <div className="dice-tool-types">
+                <button onClick={() => setSelectedDice('d4')}>D4</button>
+                <button onClick={() => setSelectedDice('d6')}>D6</button>
+                <button onClick={() => setSelectedDice('d8')}>D8</button>
+                <button onClick={() => setSelectedDice('d10')}>D10</button>
+                <button onClick={() => setSelectedDice('d12')}>D12</button>
+                <button onClick={() => setSelectedDice('d20')}>D20</button>
+                <button onClick={() => setSelectedDice('d100')} style={{ gridColumn: 'span 3' }}>D100</button>
+              </div>
+            ) : (
+              <div className="dice-tool-qty">
+                <div className="qty-header">
+                  <button onClick={() => setSelectedDice(null)}>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+                  </button>
+                  <span>Rolling {selectedDice.toUpperCase()}</span>
+                </div>
+                <div className="qty-options">
+                  <div className="qty-row">
+                    {[1, 2, 3].map(n => <button key={n} onClick={() => handleRoll(n, selectedDice)}>{n}</button>)}
+                  </div>
+                  <div className="qty-row">
+                    {[4, 5].map(n => <button key={n} onClick={() => handleRoll(n, selectedDice)}>{n}</button>)}
+                  </div>
+                  <div className="qty-custom">
+                    <input 
+                      type="number" min="6" max="100" 
+                      value={customQty} 
+                      onChange={e => setCustomQty(Number(e.target.value))}
+                      onKeyDown={e => { if(e.key === 'Enter') handleRoll(customQty, selectedDice) }}
+                    />
+                    <button onClick={() => handleRoll(customQty, selectedDice)}>Roll</button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        <button className="dice-tool-btn" onClick={() => setIsOpen(!isOpen)} title="Roll Dice">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5 12 2"/>
+            <polygon points="12 22 12 14.5"/>
+            <polygon points="22 8.5 12 14.5 2 8.5"/>
+            <polygon points="12 2 12 14.5"/>
+          </svg>
         </button>
       </div>
 
