@@ -79,7 +79,14 @@ export default function DiceRoller({ playerColor, playerName, onRollBroadcast, i
           const ctx = localRollContext.current;
           localRollContext.current = null;
           
-          addToast(`You rolled ${ctx.notation}: [${individualRolls.join(', ')}] = ${total}`, ctx.color);
+          addToastData({
+            player: playerName || 'You',
+            type: ctx.type,
+            notation: ctx.notation,
+            results: individualRolls,
+            total,
+            color: ctx.color
+          });
 
           if (onRollBroadcast) {
             onRollBroadcast({
@@ -87,12 +94,20 @@ export default function DiceRoller({ playerColor, playerName, onRollBroadcast, i
               player: playerName || 'Unknown',
               color: ctx.color,
               notation: ctx.notation,
+              diceType: ctx.type,
               results: individualRolls,
               total
             });
           }
         } else if (incomingRoll) {
-          addToast(`${incomingRoll.player} rolled ${incomingRoll.notation}: [${incomingRoll.results.join(', ')}] = ${incomingRoll.total}`, incomingRoll.color);
+          addToastData({
+            player: incomingRoll.player,
+            type: incomingRoll.diceType || incomingRoll.notation.replace(/\d+/, ''),
+            notation: incomingRoll.notation,
+            results: incomingRoll.results,
+            total: incomingRoll.total,
+            color: incomingRoll.color
+          });
         }
       }
     };
@@ -107,9 +122,9 @@ export default function DiceRoller({ playerColor, playerName, onRollBroadcast, i
     }
   }, [incomingRoll]);
 
-  const addToast = (message, color) => {
+  const addToastData = (data) => {
     const id = Date.now() + Math.random();
-    setToasts(prev => [...prev, { id, message, color }]);
+    setToasts(prev => [...prev, { id, ...data }]);
     setTimeout(() => {
       setToasts(prev => prev.filter(t => t.id !== id));
     }, 6000);
@@ -141,7 +156,7 @@ export default function DiceRoller({ playerColor, playerName, onRollBroadcast, i
     setSelectedDice(null);
 
     const notation = `${nQty}${type}`;
-    localRollContext.current = { notation, color: playerColor || '#ff5555' };
+    localRollContext.current = { notation, type, color: playerColor || '#ff5555' };
     diceBoxRef.current.roll(notation, { themeColor: playerColor || '#ff5555' }).catch(e => {
         console.error("Roll error", e);
         setIsRolling(false);
@@ -219,8 +234,21 @@ export default function DiceRoller({ playerColor, playerName, onRollBroadcast, i
       {/* Toast Notifications */}
       <div className="dice-toast-container">
         {toasts.map(t => (
-          <div key={t.id} className="dice-toast" style={{ borderLeft: `4px solid ${t.color}` }}>
-            {t.message}
+          <div key={t.id} className="dice-toast" style={{ '--toast-color': t.color }}>
+            <div className="toast-icon">
+              {getDiceIcon(t.type, 24)}
+            </div>
+            <div className="toast-content">
+              <div className="toast-player">{t.player}</div>
+              <div className="toast-result">
+                <span className="toast-notation">{t.notation}</span>
+                {t.results.length > 1 ? (
+                  <>: <span className="toast-rolls">[{t.results.join(', ')}]</span> = <span className="toast-total">{t.total}</span></>
+                ) : (
+                  <>: <span className="toast-total">{t.total}</span></>
+                )}
+              </div>
+            </div>
           </div>
         ))}
       </div>
