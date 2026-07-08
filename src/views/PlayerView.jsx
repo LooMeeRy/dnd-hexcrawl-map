@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import mqtt from 'mqtt';
 import { compressTokenImage, getHexDistance, pixelToHex } from '../utils';
+import DiceRoller from '../components/DiceRoller';
 
 const HEX_SIZE = 80;
 
@@ -21,6 +22,7 @@ export default function PlayerView() {
   const [dmTokens, setDmTokens] = useState({});
   const [persistentPings, setPersistentPings] = useState({});
   const [activePings, setActivePings] = useState([]);
+  const [incomingRoll, setIncomingRoll] = useState(null);
   
   const [cameraTarget, setCameraTarget] = useState({ q: 0, r: 0 });
   const [hasFocused, setHasFocused] = useState(false);
@@ -72,6 +74,9 @@ export default function PlayerView() {
         setActivePings(prev => [...prev, { id: pid, q: event.q, r: event.r, color: event.color }]);
         setTimeout(() => setActivePings(prev => prev.filter(p => p.id !== pid)), 1000);
         setCameraTarget({ q: event.q, r: event.r });
+      }
+      if (e.key === 'dnd-local-dice-roll' && e.newValue) {
+        setIncomingRoll(JSON.parse(e.newValue));
       }
     };
     
@@ -151,6 +156,8 @@ export default function PlayerView() {
             setActivePings(prev => [...prev, newPing]);
             setTimeout(() => { setActivePings(prev => prev.filter(p => p.id !== newPing.id)); }, 1000);
             if (event.type === 'force_focus') setCameraTarget({ q: event.q, r: event.r });
+          } else if (event.type === 'dice_roll') {
+            setIncomingRoll(event);
           }
         } catch(e) {}
       }
@@ -263,6 +270,14 @@ export default function PlayerView() {
     compressTokenImage(file, (dataUrl) => {
        setPlayerImage(dataUrl);
     });
+  };
+
+  const handleRollBroadcast = (rollEvent) => {
+    if (mqttClientRef.current && roomCode) {
+      mqttClientRef.current.publish(`dnd-room/${roomCode}/action`, JSON.stringify(rollEvent));
+    } else {
+      localStorage.setItem('dnd-local-dice-roll', JSON.stringify({ ...rollEvent, _t: Date.now() }));
+    }
   };
 
   const completeSetup = () => {
@@ -493,6 +508,13 @@ export default function PlayerView() {
           </div>
         </div>
       </div>
+      
+      <DiceRoller 
+        playerColor={playerColor} 
+        playerName={playerName || 'Player'} 
+        onRollBroadcast={handleRollBroadcast} 
+        incomingRoll={incomingRoll} 
+      />
       
     </div>
   );

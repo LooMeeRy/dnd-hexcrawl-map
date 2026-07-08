@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import mqtt from 'mqtt';
 import { compressTokenImage } from '../utils';
+import DiceRoller from '../components/DiceRoller';
 
 const HEX_SIZE = 80;
 const HEX_WIDTH = Math.sqrt(3) * HEX_SIZE;
@@ -62,6 +63,7 @@ export default function DMMapEditor() {
     try { return JSON.parse(localStorage.getItem('dnd-saved-images') || '[]'); } catch { return []; }
   });
   const [movingPlayerTokenId, setMovingPlayerTokenId] = useState(null);
+  const [incomingRoll, setIncomingRoll] = useState(null);
   
   const [roomCode, setRoomCode] = useState(null);
   const [mqttClient, setMqttClient] = useState(null);
@@ -137,6 +139,10 @@ export default function DMMapEditor() {
              setActivePings(prev => [...prev, newPing]);
              setTimeout(() => { setActivePings(prev => prev.filter(p => p.id !== newPing.id)); }, 1000);
              client.publish(`dnd-room/${code}/events`, JSON.stringify(action)); // Broadcast back to all players
+          }
+          if (action.type === 'dice_roll') {
+             setIncomingRoll(action);
+             client.publish(`dnd-room/${code}/events`, JSON.stringify(action)); // Broadcast to all players
           }
           if (action.type === 'add_player_token' || action.type === 'change_player_image') {
             setPlayerTokens(prev => {
@@ -229,6 +235,9 @@ export default function DMMapEditor() {
         const pid = Date.now()+Math.random();
         setActivePings(prev => [...prev, { id: pid, q: ping.q, r: ping.r, color: ping.color }]);
         setTimeout(() => setActivePings(prev => prev.filter(p => p.id !== pid)), 1000);
+      }
+      if (e.key === 'dnd-local-dice-roll' && e.newValue) {
+        setIncomingRoll(JSON.parse(e.newValue));
       }
     };
     window.addEventListener('storage', handleStorage);
@@ -705,6 +714,19 @@ export default function DMMapEditor() {
           </div>
         </div>
       </div>
+      
+      <DiceRoller 
+        playerColor={dmPingColor} 
+        playerName="Dungeon Master" 
+        onRollBroadcast={(rollEvent) => {
+          if (mqttClient && roomCode) {
+            mqttClient.publish(`dnd-room/${roomCode}/events`, JSON.stringify(rollEvent));
+          } else {
+            localStorage.setItem('dnd-local-dice-roll', JSON.stringify({ ...rollEvent, _t: Date.now() }));
+          }
+        }} 
+        incomingRoll={incomingRoll} 
+      />
       
     </div>
   );
