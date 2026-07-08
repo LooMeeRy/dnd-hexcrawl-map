@@ -9,12 +9,15 @@ export default function DiceRoller({ playerColor, playerName, onRollBroadcast, i
   const [diceType, setDiceType] = useState('d20');
   const [isRolling, setIsRolling] = useState(false);
   const [toasts, setToasts] = useState([]);
+  
+  // Create a unique ID for the container so we can pass a CSS selector to DiceBox
+  const containerId = useRef(`dice-box-${Date.now()}-${Math.floor(Math.random() * 1000)}`);
 
   // Initialize DiceBox
   useEffect(() => {
     if (!containerRef.current) return;
     
-    const box = new DiceBox(containerRef.current, {
+    const box = new DiceBox(`#${containerId.current}`, {
       assetPath: '/assets/dice-box/', // must match the public folder path
       theme: 'default',
       themeColor: playerColor || '#ff5555',
@@ -110,6 +113,7 @@ export default function DiceRoller({ playerColor, playerName, onRollBroadcast, i
     <>
       {/* 3D Dice Canvas Container */}
       <div 
+        id={containerId.current}
         ref={containerRef} 
         style={{
           position: 'absolute',
