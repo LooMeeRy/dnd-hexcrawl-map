@@ -99,38 +99,25 @@ export default function DiceRoller({ playerColor, playerName, onRollBroadcast, i
               total
             });
           }
-        } else if (incomingRoll) {
-          addToastData({
-            player: incomingRoll.player,
-            type: incomingRoll.diceType || incomingRoll.notation.replace(/\d+/, ''),
-            notation: incomingRoll.notation,
-            results: incomingRoll.results,
-            total: incomingRoll.total,
-            color: incomingRoll.color
-          });
         }
       }
     };
-  }, [incomingRoll, onRollBroadcast, playerName]);
+  }, [onRollBroadcast, playerName]);
 
   // Handle incoming networked rolls
   useEffect(() => {
-    if (incomingRoll && diceBoxRef.current) {
-      const notation = incomingRoll.notation;
-      localRollContext.current = null; // ensure it's marked as networked
-      
-      if (incomingRoll.results && incomingRoll.diceType) {
-        const sides = parseInt(incomingRoll.diceType.replace('d', '')) || 20;
-        const notationObj = incomingRoll.results.map(val => ({
-          sides: sides,
-          qty: 1,
-          value: val,
-          themeColor: incomingRoll.color || '#ff5555'
-        }));
-        diceBoxRef.current.roll(notationObj).catch(e => console.error("Remote roll error", e));
-      } else {
-        diceBoxRef.current.roll(notation, { themeColor: incomingRoll.color }).catch(e => console.error("Remote roll error", e));
-      }
+    if (incomingRoll) {
+      // Since syncing 3D physics across AmmoJS instances is non-deterministic 
+      // without a server physics authority, we disable the visual 3D roll for remote players 
+      // and directly show the accurate result toast instead.
+      addToastData({
+        player: incomingRoll.player,
+        type: incomingRoll.diceType || incomingRoll.notation.replace(/\d+/, ''),
+        notation: incomingRoll.notation,
+        results: incomingRoll.results,
+        total: incomingRoll.total,
+        color: incomingRoll.color
+      });
     }
   }, [incomingRoll]);
 
