@@ -386,19 +386,18 @@ button:active { transform: scale(0.96); }
 /* Dice Roller UI */
 .dice-ui-panel {
   position: absolute;
-  top: 50%;
+  bottom: 24px;
   left: 24px;
-  transform: translateY(-50%);
   z-index: 950;
-  background: rgba(15, 15, 15, 0.85);
-  backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 16px;
+  background: rgba(10, 10, 10, 0.7);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 20px;
   padding: 16px;
   display: flex;
   flex-direction: column;
   gap: 12px;
-  box-shadow: 0 12px 32px rgba(0,0,0,0.6);
+  box-shadow: 0 20px 40px rgba(0,0,0,0.8);
   width: 140px;
 }
 .dice-ui-panel h4 {
@@ -456,11 +455,12 @@ button:active { transform: scale(0.96); }
   pointer-events: none;
 }
 .dice-toast {
-  background: rgba(20, 20, 20, 0.95);
+  background: rgba(10, 10, 10, 0.8);
   backdrop-filter: blur(12px);
   color: white;
   padding: 12px 24px;
-  border-radius: 8px;
+  border-radius: 30px;
+  border: 1px solid rgba(255,255,255,0.05);
   font-size: 0.95rem;
   font-weight: 500;
   box-shadow: 0 8px 24px rgba(0,0,0,0.6);

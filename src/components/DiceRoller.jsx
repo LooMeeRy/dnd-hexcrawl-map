@@ -21,7 +21,7 @@ export default function DiceRoller({ playerColor, playerName, onRollBroadcast, i
       assetPath: '/assets/dice-box/', // must match the public folder path
       theme: 'default',
       themeColor: playerColor || '#ff5555',
-      scale: 6,
+      scale: 9,
       spinForce: 6,
       throwForce: 6,
       gravity: 3,
@@ -46,20 +46,60 @@ export default function DiceRoller({ playerColor, playerName, onRollBroadcast, i
     }
   }, [playerColor]);
 
+  const localRollContext = useRef(null);
+  const clearTimerRef = useRef(null);
+
+  useEffect(() => {
+    if (!diceBoxRef.current) return;
+    diceBoxRef.current.onRollComplete = (results) => {
+      setIsRolling(false);
+      
+      // Auto clear dice after 7 seconds
+      if (clearTimerRef.current) clearTimeout(clearTimerRef.current);
+      clearTimerRef.current = setTimeout(() => {
+        if (diceBoxRef.current) diceBoxRef.current.clear();
+      }, 7000);
+
+      let rollGroup = null;
+      if (Array.isArray(results) && results.length > 0) {
+        rollGroup = results[0];
+      } else if (results && results.value) {
+        rollGroup = results;
+      }
+
+      if (rollGroup && rollGroup.rolls) {
+        const individualRolls = rollGroup.rolls.map(r => r.value);
+        const total = rollGroup.value;
+
+        if (localRollContext.current) {
+          const ctx = localRollContext.current;
+          localRollContext.current = null;
+          
+          addToast(`You rolled ${ctx.notation}: [${individualRolls.join(', ')}] = ${total}`, ctx.color);
+
+          if (onRollBroadcast) {
+            onRollBroadcast({
+              type: 'dice_roll',
+              player: playerName || 'Unknown',
+              color: ctx.color,
+              notation: ctx.notation,
+              results: individualRolls,
+              total
+            });
+          }
+        } else if (incomingRoll) {
+          addToast(`${incomingRoll.player} rolled ${incomingRoll.notation}: [${incomingRoll.results.join(', ')}] = ${incomingRoll.total}`, incomingRoll.color);
+        }
+      }
+    };
+  }, [incomingRoll, onRollBroadcast, playerName]);
+
   // Handle incoming networked rolls
   useEffect(() => {
     if (incomingRoll && diceBoxRef.current) {
-      // Try to roll the dice on screen so they see it
-      // Even if we can't force the result visually on all clients perfectly, 
-      // they will see the dice fall and then the toast will pop up with the true result.
-      
-      const notation = incomingRoll.notation; 
-      
-      // We pass the roller's color to the options parameter to override our own config!
-      diceBoxRef.current.roll(notation, { themeColor: incomingRoll.color })
-        .then(() => {
-           addToast(`${incomingRoll.player} rolled ${notation}: [${incomingRoll.results.join(', ')}] = ${incomingRoll.total}`, incomingRoll.color);
-        });
+      const notation = incomingRoll.notation;
+      localRollContext.current = null; // ensure it's marked as networked
+      diceBoxRef.current.roll(notation, { themeColor: incomingRoll.color });
     }
   }, [incomingRoll]);
 
@@ -74,39 +114,13 @@ export default function DiceRoller({ playerColor, playerName, onRollBroadcast, i
   const handleRoll = () => {
     if (!diceBoxRef.current || isRolling) return;
     setIsRolling(true);
-    
+
     const notation = `${qty}${diceType}`;
-    
-    diceBoxRef.current.roll(notation, { themeColor: playerColor || '#ff5555' })
-      .then(results => {
-        setIsRolling(false);
-        // results is an array of Roll Result Array Objects
-        // Example: [{ qty: 2, sides: 20, value: 34, rolls: [...] }]
-        if (results && results.length > 0) {
-           const rollGroup = results[0];
-           const individualRolls = rollGroup.rolls.map(r => r.value);
-           const total = rollGroup.value;
-           
-           // Notify locally
-           addToast(`You rolled ${notation}: [${individualRolls.join(', ')}] = ${total}`, playerColor);
-           
-           // Broadcast to others
-           if (onRollBroadcast) {
-             onRollBroadcast({
-               type: 'dice_roll',
-               player: playerName || 'Unknown',
-               color: playerColor || '#ff5555',
-               notation,
-               results: individualRolls,
-               total
-             });
-           }
-        }
-      })
-      .catch(e => {
+    localRollContext.current = { notation, color: playerColor || '#ff5555' };
+    diceBoxRef.current.roll(notation, { themeColor: playerColor || '#ff5555' }).catch(e => {
         console.error("Roll error", e);
         setIsRolling(false);
-      });
+    });
   };
 
   return (
