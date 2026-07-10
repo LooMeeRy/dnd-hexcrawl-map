@@ -496,18 +496,18 @@ export default function DMMapEditor() {
                  mqttClient.publish(`dnd-room/${roomCode}/events`, JSON.stringify({ type: mode === 'normal' ? 'local_ping' : 'local_force_focus', localX: lx, localY: ly, color: dmPingColor }));
                }
              } else if (mode === 'persistent') {
-               const key = `${Math.round(lx)},${Math.round(ly)}`;
+               const key = `${activeLocalHex.q},${activeLocalHex.r}_${Math.round(lx)},${Math.round(ly)}`;
                setPersistentLocalPings(prev => {
                   const next = {...prev};
                   if (next[key]) delete next[key];
-                  else next[key] = { localX: lx, localY: ly, color: dmPingColor, speed: dmPingSpeed };
+                  else next[key] = { q: activeLocalHex.q, r: activeLocalHex.r, localX: lx, localY: ly, color: dmPingColor, speed: dmPingSpeed };
                   return next;
                });
                // Note: persistent local pings are local-only for now unless synced.
              }
           }}
           activeLocalPings={activeLocalPings}
-          persistentLocalPings={persistentLocalPings}
+          persistentLocalPings={Object.fromEntries(Object.entries(persistentLocalPings).filter(([k, p]) => p.q === activeLocalHex.q && p.r === activeLocalHex.r))}
           pingMode={pingMode}
           onSetPingMode={setPingMode}
           onExit={() => { setViewMode('macro'); setActiveLocalHex(null); }}

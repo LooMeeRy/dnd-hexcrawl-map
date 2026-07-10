@@ -396,7 +396,7 @@ export default function PlayerView() {
              }
           }}
           activeLocalPings={activeLocalPings}
-          persistentLocalPings={persistentLocalPings}
+          persistentLocalPings={Object.fromEntries(Object.entries(persistentLocalPings).filter(([k, p]) => p.q === activeLocalHex.q && p.r === activeLocalHex.r))}
           localCameraTarget={localCameraTarget}
           onExit={() => { setViewMode('macro'); setActiveLocalHex(null); }}
         />
