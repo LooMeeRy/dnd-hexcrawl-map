@@ -10,7 +10,10 @@ export default function LocalMap({
   isDM,
   onUpdateLocalImage,
   onLocalPing,
-  activeLocalPings = []
+  activeLocalPings = [],
+  persistentLocalPings = {},
+  pingMode = 'none',
+  onSetPingMode
 }) {
   const [pan, setPan] = useState({ x: typeof window !== 'undefined' ? window.innerWidth / 2 - 800 : 0, y: typeof window !== 'undefined' ? window.innerHeight / 2 - 800 : 0 });
   const [isPanning, setIsPanning] = useState(false);
@@ -44,8 +47,10 @@ export default function LocalMap({
 
   const handleMouseDown = (e) => {
     if (e.button !== 0) return;
-    if (e.altKey) {
-      if (onLocalPing) onLocalPing(e.clientX - pan.x, e.clientY - pan.y);
+    if (e.altKey || pingMode !== 'none') {
+      const mode = (e.altKey && pingMode === 'none') ? 'normal' : pingMode;
+      if (onLocalPing) onLocalPing(e.clientX - pan.x, e.clientY - pan.y, mode);
+      if (!e.altKey && onSetPingMode) onSetPingMode('none');
       return;
     }
     setIsPanning(true);
@@ -196,6 +201,14 @@ export default function LocalMap({
         {/* Local Pings */}
         {activeLocalPings.map(p => (
            <div key={p.id} className="ping-circle" style={{ left: p.localX, top: p.localY, '--ping-color': p.color }} />
+        ))}
+
+        {/* Persistent Local Pings */}
+        {Object.entries(persistentLocalPings || {}).map(([key, p]) => (
+           <React.Fragment key={`pp-${key}`}>
+             <div className="persistent-ping" style={{ left: p.localX, top: p.localY, '--ping-color': p.color, '--ping-speed': p.speed || '2s' }} />
+             <div className="persistent-ping-core" style={{ left: p.localX, top: p.localY, '--ping-color': p.color }} />
+           </React.Fragment>
         ))}
 
         {/* DM Tokens */}

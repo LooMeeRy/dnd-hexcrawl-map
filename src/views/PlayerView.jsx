@@ -22,6 +22,7 @@ export default function PlayerView() {
   const [playerTokens, setPlayerTokens] = useState({});
   const [dmTokens, setDmTokens] = useState({});
   const [persistentPings, setPersistentPings] = useState({});
+  const [persistentLocalPings, setPersistentLocalPings] = useState({});
   const [activePings, setActivePings] = useState([]);
   const [activeLocalPings, setActiveLocalPings] = useState([]);
   const [incomingRoll, setIncomingRoll] = useState(null);
@@ -58,12 +59,14 @@ export default function PlayerView() {
       if (e.key === 'dnd-players-local-sync' && e.newValue) setPlayerTokens(JSON.parse(e.newValue));
       if (e.key === 'dnd-dmtokens-local-sync' && e.newValue) setDmTokens(JSON.parse(e.newValue));
       if (e.key === 'dnd-persistent-pings-local-sync' && e.newValue) setPersistentPings(JSON.parse(e.newValue));
+      if (e.key === 'dnd-persistent-local-pings-local-sync' && e.newValue) setPersistentLocalPings(JSON.parse(e.newValue));
     };
     
     const m = localStorage.getItem('dnd-map-local-sync'); if (m) setActiveHexes(JSON.parse(m));
     const p = localStorage.getItem('dnd-players-local-sync'); if (p) setPlayerTokens(JSON.parse(p));
     const d = localStorage.getItem('dnd-dmtokens-local-sync'); if (d) setDmTokens(JSON.parse(d));
     const pp = localStorage.getItem('dnd-persistent-pings-local-sync'); if (pp) setPersistentPings(JSON.parse(pp));
+    const plp = localStorage.getItem('dnd-persistent-local-pings-local-sync'); if (plp) setPersistentLocalPings(JSON.parse(plp));
     
     const handleStoragePing = (e) => {
       if (e.key === 'dnd-local-ping' && e.newValue) {
@@ -155,6 +158,7 @@ export default function PlayerView() {
           if (data.players) setPlayerTokens(data.players);
           if (data.dmTokens) setDmTokens(data.dmTokens);
           if (data.persistentPings) setPersistentPings(data.persistentPings);
+          if (data.persistentLocalPings) setPersistentLocalPings(data.persistentLocalPings);
         } catch (e) {}
       }
       
@@ -388,6 +392,7 @@ export default function PlayerView() {
              }
           }}
           activeLocalPings={activeLocalPings}
+          persistentLocalPings={persistentLocalPings}
           onExit={() => { setViewMode('macro'); setActiveLocalHex(null); }}
         />
       ) : (

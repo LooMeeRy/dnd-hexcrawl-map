@@ -45,6 +45,7 @@ export default function DMMapEditor() {
   });
   const [activePings, setActivePings] = useState([]);
   const [activeLocalPings, setActiveLocalPings] = useState([]);
+  const [persistentLocalPings, setPersistentLocalPings] = useState({});
   const [pingMode, setPingMode] = useState('none');
   const [dmPingColor, setDmPingColor] = useState('#ff5555');
   const [dmPingSpeed, setDmPingSpeed] = useState('2s');
@@ -91,12 +92,14 @@ export default function DMMapEditor() {
       localStorage.setItem(`dnd-players-${campaignId}`, JSON.stringify(playerTokens));
       localStorage.setItem(`dnd-dmtokens-${campaignId}`, JSON.stringify(dmTokens));
       localStorage.setItem(`dnd-persistent-pings-${campaignId}`, JSON.stringify(persistentPings));
+      localStorage.setItem(`dnd-persistent-local-pings-${campaignId}`, JSON.stringify(persistentLocalPings));
       
       // Master sync file for Local mode
       localStorage.setItem('dnd-map-local-sync', JSON.stringify(activeHexes));
       localStorage.setItem('dnd-players-local-sync', JSON.stringify(playerTokens));
       localStorage.setItem('dnd-dmtokens-local-sync', JSON.stringify(dmTokens));
       localStorage.setItem('dnd-persistent-pings-local-sync', JSON.stringify(persistentPings));
+      localStorage.setItem('dnd-persistent-local-pings-local-sync', JSON.stringify(persistentLocalPings));
     } catch (e) {
       console.error('Storage quota exceeded! Cannot save current map state.', e);
       if (e.name === 'QuotaExceededError') {
@@ -106,9 +109,9 @@ export default function DMMapEditor() {
     
     if (mqttClient && roomCode) {
       mqttClient.publish(`dnd-room/${roomCode}/map`, JSON.stringify(activeHexes));
-      mqttClient.publish(`dnd-room/${roomCode}/tokens`, JSON.stringify({ players: playerTokens, dmTokens, persistentPings }));
+      mqttClient.publish(`dnd-room/${roomCode}/tokens`, JSON.stringify({ players: playerTokens, dmTokens, persistentPings, persistentLocalPings }));
     }
-  }, [activeHexes, playerTokens, dmTokens, persistentPings, mqttClient, roomCode, campaignId]);
+  }, [activeHexes, playerTokens, dmTokens, persistentPings, persistentLocalPings, mqttClient, roomCode, campaignId]);
 
   const startOnline = () => {
     if (mqttClient || isConnecting) return;
@@ -151,7 +154,7 @@ export default function DMMapEditor() {
             setTimeout(() => setActivePings(prev => prev.filter(p => p.id !== pid)), 1000);
             mqttClient.publish(`dnd-room/${roomCode}/events`, JSON.stringify(action)); // Broadcast to players
           }
-          if (action.type === 'local_ping') {
+          if (action.type === 'local_ping' || action.type === 'local_force_focus') {
             const pid = Date.now()+Math.random();
             setActiveLocalPings(prev => [...prev, { id: pid, localX: action.localX, localY: action.localY, color: action.color || '#ff5555' }]);
             setTimeout(() => setActiveLocalPings(prev => prev.filter(p => p.id !== pid)), 1000);
@@ -477,53 +480,32 @@ export default function DMMapEditor() {
                 return { ...prev, [key]: { ...hex, localImage: imageUrl } };
              });
           }}
-          onLocalPing={(lx, ly) => {
-             const pid = Date.now() + Math.random();
-             setActiveLocalPings(prev => [...prev, { id: pid, localX: lx, localY: ly, color: dmPingColor }]);
-             setTimeout(() => setActiveLocalPings(prev => prev.filter(p => p.id !== pid)), 1000);
-             if (mqttClient && roomCode) {
-               mqttClient.publish(`dnd-room/${roomCode}/events`, JSON.stringify({ type: 'local_ping', localX: lx, localY: ly, color: dmPingColor }));
+          onLocalPing={(lx, ly, mode) => {
+             if (mode === 'normal' || mode === 'force_focus') {
+               const pid = Date.now() + Math.random();
+               setActiveLocalPings(prev => [...prev, { id: pid, localX: lx, localY: ly, color: dmPingColor }]);
+               setTimeout(() => setActiveLocalPings(prev => prev.filter(p => p.id !== pid)), 1000);
+               if (mqttClient && roomCode) {
+                 mqttClient.publish(`dnd-room/${roomCode}/events`, JSON.stringify({ type: mode === 'normal' ? 'local_ping' : 'local_force_focus', localX: lx, localY: ly, color: dmPingColor }));
+               }
+             } else if (mode === 'persistent') {
+               const key = `${Math.round(lx)},${Math.round(ly)}`;
+               setPersistentLocalPings(prev => {
+                  const next = {...prev};
+                  if (next[key]) delete next[key];
+                  else next[key] = { localX: lx, localY: ly, color: dmPingColor, speed: dmPingSpeed };
+                  return next;
+               });
+               // Note: persistent local pings are local-only for now unless synced.
              }
           }}
           activeLocalPings={activeLocalPings}
+          persistentLocalPings={persistentLocalPings}
+          pingMode={pingMode}
+          onSetPingMode={setPingMode}
           onExit={() => { setViewMode('macro'); setActiveLocalHex(null); }}
         />
       ) : (
-      <>
-      {/* DM Ping Minimal Toolbar */}
-      <div className="ping-toolbar">
-         <div className="ping-tool-item color-picker-wrap" title="Ping Color">
-            <div className="color-swatch" style={{ background: dmPingColor }}></div>
-            <input type="color" value={dmPingColor} onChange={e => setDmPingColor(e.target.value)} />
-         </div>
-         
-         <div className="toolbar-divider" />
-         
-         <button className={`ping-tool-btn ${pingMode === 'normal' ? 'active' : ''}`} onClick={() => setPingMode(pingMode === 'normal' ? 'none' : 'normal')} title="Normal Ping (or Alt+Click)">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>
-         </button>
-         
-         <button className={`ping-tool-btn ${pingMode === 'force_focus' ? 'active' : ''}`} onClick={() => setPingMode(pingMode === 'force_focus' ? 'none' : 'force_focus')} title="Force Camera Focus">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-         </button>
-         
-         <button className={`ping-tool-btn ${pingMode === 'persistent' ? 'active' : ''}`} onClick={() => setPingMode(pingMode === 'persistent' ? 'none' : 'persistent')} title="Persistent Ping (Click map to place/remove)">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h.01"/><path d="M8.5 16.429a5 5 0 0 1 7 0"/><path d="M5.671 13.522a9 9 0 0 1 12.658 0"/><path d="M2.843 10.615a13 13 0 0 1 18.314 0"/></svg>
-         </button>
-
-         {pingMode === 'persistent' && (
-           <>
-             <div className="toolbar-divider" />
-             <button className="ping-tool-btn speed-btn" onClick={() => {
-                const speeds = ['0.5s', '1s', '2s', '4s'];
-                setDmPingSpeed(speeds[(speeds.indexOf(dmPingSpeed) + 1) % speeds.length]);
-             }} title="Toggle Pulse Speed">
-               {dmPingSpeed}
-             </button>
-           </>
-         )}
-      </div>
-
       <div className="hex-grid-container">
         <div className="hex-grid" style={{ transform: `translate(${-centerPos.x}px, ${-centerPos.y}px)` }}>
           {/* Hexes */}
@@ -712,8 +694,41 @@ export default function DMMapEditor() {
           )}
         </div>
       </div>
-      </>
       )}
+
+      {/* DM Ping Minimal Toolbar (Overlay) */}
+      <div className="ping-toolbar">
+         <div className="ping-tool-item color-picker-wrap" title="Ping Color">
+            <div className="color-swatch" style={{ background: dmPingColor }}></div>
+            <input type="color" value={dmPingColor} onChange={e => setDmPingColor(e.target.value)} />
+         </div>
+         
+         <div className="toolbar-divider" />
+         
+         <button className={`ping-tool-btn ${pingMode === 'normal' ? 'active' : ''}`} onClick={() => setPingMode(pingMode === 'normal' ? 'none' : 'normal')} title="Normal Ping (or Alt+Click)">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>
+         </button>
+         
+         <button className={`ping-tool-btn ${pingMode === 'force_focus' ? 'active' : ''}`} onClick={() => setPingMode(pingMode === 'force_focus' ? 'none' : 'force_focus')} title="Force Camera Focus">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+         </button>
+         
+         <button className={`ping-tool-btn ${pingMode === 'persistent' ? 'active' : ''}`} onClick={() => setPingMode(pingMode === 'persistent' ? 'none' : 'persistent')} title="Persistent Ping (Click map to place/remove)">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h.01"/><path d="M8.5 16.429a5 5 0 0 1 7 0"/><path d="M5.671 13.522a9 9 0 0 1 12.658 0"/><path d="M2.843 10.615a13 13 0 0 1 18.314 0"/></svg>
+         </button>
+
+         {pingMode === 'persistent' && (
+           <>
+             <div className="toolbar-divider" />
+             <button className="ping-tool-btn speed-btn" onClick={() => {
+                const speeds = ['0.5s', '1s', '2s', '4s'];
+                setDmPingSpeed(speeds[(speeds.indexOf(dmPingSpeed) + 1) % speeds.length]);
+             }} title="Toggle Pulse Speed">
+               {dmPingSpeed}
+             </button>
+           </>
+         )}
+      </div>
 
       {/* Hex Image Modal */}
       <div className={`image-modal ${modalOpen ? '' : 'hidden'}`}>
