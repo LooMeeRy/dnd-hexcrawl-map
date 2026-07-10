@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import mqtt from 'mqtt';
 import { compressTokenImage } from '../utils';
 import DiceRoller from '../components/DiceRoller';
+import LocalMap from '../components/LocalMap';
 
 const HEX_SIZE = 80;
 const HEX_WIDTH = Math.sqrt(3) * HEX_SIZE;
@@ -59,6 +60,8 @@ export default function DMMapEditor() {
 
   const [cameraTarget, setCameraTarget] = useState({ q: 0, r: 0 });
   const [contextMenu, setContextMenu] = useState({ visible: false, type: 'hex', gridX: 0, gridY: 0, q: 0, r: 0, targetId: null });
+  const [viewMode, setViewMode] = useState('macro'); // 'macro' or 'local'
+  const [activeLocalHex, setActiveLocalHex] = useState(null); // {q, r}
   const [savedImages, setSavedImages] = useState(() => {
     try { return JSON.parse(localStorage.getItem('dnd-saved-images') || '[]'); } catch { return []; }
   });
@@ -163,7 +166,16 @@ export default function DMMapEditor() {
           if (action.type === 'move_player') {
             setPlayerTokens(prev => {
               if (!prev[action.playerId]) return prev;
-              return { ...prev, [action.playerId]: { ...prev[action.playerId], q: action.q, r: action.r } };
+              return { 
+                ...prev, 
+                [action.playerId]: { 
+                  ...prev[action.playerId], 
+                  q: action.q !== undefined ? action.q : prev[action.playerId].q, 
+                  r: action.r !== undefined ? action.r : prev[action.playerId].r,
+                  localX: action.localX !== undefined ? action.localX : prev[action.playerId].localX,
+                  localY: action.localY !== undefined ? action.localY : prev[action.playerId].localY
+                } 
+              };
             });
           }
         } catch(e){}
@@ -428,6 +440,33 @@ export default function DMMapEditor() {
         )}
       </div>
 
+      {viewMode === 'local' && activeLocalHex ? (
+        <LocalMap 
+          hex={activeHexes[`${activeLocalHex.q},${activeLocalHex.r}`] || { q: activeLocalHex.q, r: activeLocalHex.r }}
+          playerTokens={Object.entries(playerTokens).map(([id, t]) => ({ id, ...t })).filter(t => t.q === activeLocalHex.q && t.r === activeLocalHex.r)}
+          dmTokens={Object.entries(dmTokens).map(([id, t]) => ({ id, ...t })).filter(t => t.q === activeLocalHex.q && t.r === activeLocalHex.r)}
+          isDM={true}
+          onUpdatePlayerToken={(id, updates) => {
+            setPlayerTokens(prev => {
+               const next = { ...prev, [id]: { ...prev[id], ...updates } };
+               if (mqttClient && roomCode) mqttClient.publish(`dnd-room/${roomCode}/action`, JSON.stringify({ type: 'move_player', playerId: id, ...updates }));
+               return next;
+            });
+          }}
+          onUpdateDmToken={(id, updates) => {
+            setDmTokens(prev => ({ ...prev, [id]: { ...prev[id], ...updates } }));
+          }}
+          onUpdateLocalImage={(imageUrl) => {
+             setActiveHexes(prev => {
+                const key = `${activeLocalHex.q},${activeLocalHex.r}`;
+                const hex = prev[key] || { q: activeLocalHex.q, r: activeLocalHex.r };
+                return { ...prev, [key]: { ...hex, localImage: imageUrl } };
+             });
+          }}
+          onExit={() => { setViewMode('macro'); setActiveLocalHex(null); }}
+        />
+      ) : (
+      <>
       {/* DM Ping Minimal Toolbar */}
       <div className="ping-toolbar">
          <div className="ping-tool-item color-picker-wrap" title="Ping Color">
@@ -604,6 +643,11 @@ export default function DMMapEditor() {
             <div className="context-menu" style={{ position: 'absolute', left: contextMenu.gridX, top: contextMenu.gridY, zIndex: 1000 }} onClick={(e) => e.stopPropagation()}>
               {contextMenu.type === 'hex' && (
                 <>
+                  <button onClick={() => {
+                    setActiveLocalHex({ q: contextMenu.q, r: contextMenu.r });
+                    setViewMode('local');
+                    setContextMenu({ ...contextMenu, visible: false });
+                  }}>Enter Local Map</button>
                   {movingPlayerTokenId && (
                     <button style={{ color: '#55ff55' }} onClick={() => {
                       setPlayerTokens(prev => ({ ...prev, [movingPlayerTokenId]: { ...prev[movingPlayerTokenId], q: contextMenu.q, r: contextMenu.r } }));
@@ -645,6 +689,8 @@ export default function DMMapEditor() {
           )}
         </div>
       </div>
+      </>
+      )}
 
       {/* Hex Image Modal */}
       <div className={`image-modal ${modalOpen ? '' : 'hidden'}`}>

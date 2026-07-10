@@ -3,6 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import mqtt from 'mqtt';
 import { compressTokenImage, getHexDistance, pixelToHex } from '../utils';
 import DiceRoller from '../components/DiceRoller';
+import LocalMap from '../components/LocalMap';
 
 const HEX_SIZE = 80;
 
@@ -33,6 +34,8 @@ export default function PlayerView() {
   
   const [mqttClient, setMqttClient] = useState(null);
   const [contextMenu, setContextMenu] = useState({ visible: false, type: 'hex', x: 0, y: 0, q: 0, r: 0, targetId: null });
+  const [viewMode, setViewMode] = useState('macro'); // 'macro' or 'local'
+  const [activeLocalHex, setActiveLocalHex] = useState(null); // {q, r}
 
   // Player Identity
   const [setupModalOpen, setSetupModalOpen] = useState(false);
@@ -345,6 +348,27 @@ export default function PlayerView() {
         )}
       </div>
 
+      {viewMode === 'local' && activeLocalHex ? (
+        <LocalMap 
+          hex={activeHexes[`${activeLocalHex.q},${activeLocalHex.r}`] || { q: activeLocalHex.q, r: activeLocalHex.r }}
+          playerTokens={Object.entries(playerTokens).map(([id, t]) => ({ id, ...t })).filter(t => t.q === activeLocalHex.q && t.r === activeLocalHex.r)}
+          dmTokens={Object.entries(dmTokens).map(([id, t]) => ({ id, ...t })).filter(t => t.q === activeLocalHex.q && t.r === activeLocalHex.r)}
+          isDM={false}
+          onUpdatePlayerToken={(id, updates) => {
+            if (id !== myPlayerId) return; // Players can only drag their own token
+            setPlayerTokens(prev => {
+               const next = { ...prev, [id]: { ...prev[id], ...updates } };
+               if (mqttClientRef.current && roomCode) {
+                 mqttClientRef.current.publish(`dnd-room/${roomCode}/action`, JSON.stringify({ type: 'move_player', playerId: id, ...updates }));
+               }
+               return next;
+            });
+          }}
+          onUpdateDmToken={() => {}} // Players cannot update DM tokens
+          onUpdateLocalImage={() => {}} // Players cannot update images
+          onExit={() => { setViewMode('macro'); setActiveLocalHex(null); }}
+        />
+      ) : (
       <div className="hex-grid-container">
         <div className="hex-grid" style={{ transform: `translate(${-centerPos.x}px, ${-centerPos.y}px)` }}>
           {(fogEnabled ? Object.values(memoryMap) : Object.values(activeHexes)).map(hex => {
@@ -459,12 +483,21 @@ export default function PlayerView() {
           {contextMenu.visible && (
             <div className="context-menu" style={{ position: 'absolute', left: contextMenu.gridX, top: contextMenu.gridY, zIndex: 1000 }} onClick={(e) => e.stopPropagation()}>
               {contextMenu.type === 'hex' && (
-                <button onClick={() => {
-                  if (mqttClient) {
-                     mqttClient.publish(`dnd-room/${roomCode}/action`, JSON.stringify({ type: 'move_player', playerId: myPlayerId, q: contextMenu.q, r: contextMenu.r }));
-                  }
-                  setContextMenu({ ...contextMenu, visible: false });
-                }}>Move My Token Here</button>
+                <>
+                  {playerTokens[myPlayerId] && playerTokens[myPlayerId].q === contextMenu.q && playerTokens[myPlayerId].r === contextMenu.r && (
+                    <button onClick={() => {
+                      setActiveLocalHex({ q: contextMenu.q, r: contextMenu.r });
+                      setViewMode('local');
+                      setContextMenu({ ...contextMenu, visible: false });
+                    }}>Enter Local Map</button>
+                  )}
+                  <button onClick={() => {
+                    if (mqttClient) {
+                       mqttClient.publish(`dnd-room/${roomCode}/action`, JSON.stringify({ type: 'move_player', playerId: myPlayerId, q: contextMenu.q, r: contextMenu.r }));
+                    }
+                    setContextMenu({ ...contextMenu, visible: false });
+                  }}>Move My Token Here</button>
+                </>
               )}
               {contextMenu.type === 'player_token' && (
                 <button onClick={() => {
@@ -476,6 +509,7 @@ export default function PlayerView() {
           )}
         </div>
       </div>
+      )}
 
       {/* Setup Modal */}
       <div className={`image-modal ${setupModalOpen ? '' : 'hidden'}`}>
