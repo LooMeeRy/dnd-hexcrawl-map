@@ -17,6 +17,7 @@ export default function LocalMap({
   onUpdateLocalSettings
 }) {
   const [pan, setPan] = useState({ x: typeof window !== 'undefined' ? window.innerWidth / 2 - 800 : 0, y: typeof window !== 'undefined' ? window.innerHeight / 2 - 800 : 0 });
+  const [zoom, setZoom] = useState(1);
   const [isPanning, setIsPanning] = useState(false);
   const [startPan, setStartPan] = useState({ x: 0, y: 0 });
   const [mapDimensions, setMapDimensions] = useState({ width: 1600, height: 1600 });
@@ -60,7 +61,7 @@ export default function LocalMap({
     if (e.button !== 0) return;
     if (e.altKey || pingMode !== 'none') {
       const mode = (e.altKey && pingMode === 'none') ? 'normal' : pingMode;
-      if (onLocalPing) onLocalPing(e.clientX - pan.x, e.clientY - pan.y, mode);
+      if (onLocalPing) onLocalPing((e.clientX - pan.x) / zoom, (e.clientY - pan.y) / zoom, mode);
       if (!e.altKey && onSetPingMode) onSetPingMode('none');
       return;
     }
@@ -80,19 +81,79 @@ export default function LocalMap({
       const screenW = window.innerWidth;
       const screenH = window.innerHeight;
       
-      const paddingX = screenW / 2;
-      const paddingY = screenH / 2;
+      // Strict boundary: don't let map edges enter the screen if map is larger than screen.
+      // If map is smaller than screen, keep it centered or allow limited panning.
+      let minX, maxX, minY, maxY;
       
-      const minX = paddingX - mapDimensions.width;
-      const maxX = paddingX;
-      const minY = paddingY - mapDimensions.height;
-      const maxY = paddingY;
+      const scaledWidth = mapDimensions.width * zoom;
+      const scaledHeight = mapDimensions.height * zoom;
+
+      if (scaledWidth > screenW) {
+        minX = screenW - scaledWidth;
+        maxX = 0;
+      } else {
+        minX = (screenW - scaledWidth) / 2;
+        maxX = (screenW - scaledWidth) / 2;
+      }
+
+      if (scaledHeight > screenH) {
+        minY = screenH - scaledHeight;
+        maxY = 0;
+      } else {
+        minY = (screenH - scaledHeight) / 2;
+        maxY = (screenH - scaledHeight) / 2;
+      }
 
       newX = Math.max(minX, Math.min(maxX, newX));
       newY = Math.max(minY, Math.min(maxY, newY));
 
       setPan({ x: newX, y: newY });
     }
+  };
+
+  const handleWheel = (e) => {
+    if (isSettingsOpen) return;
+    
+    const zoomDelta = e.deltaY > 0 ? -0.1 : 0.1;
+    let newZoom = Math.max(0.2, Math.min(4, zoom + zoomDelta));
+    
+    const mouseX = e.clientX;
+    const mouseY = e.clientY;
+    
+    const pointX = (mouseX - pan.x) / zoom;
+    const pointY = (mouseY - pan.y) / zoom;
+    
+    let newPanX = mouseX - pointX * newZoom;
+    let newPanY = mouseY - pointY * newZoom;
+    
+    const screenW = window.innerWidth;
+    const screenH = window.innerHeight;
+    
+    let minX, maxX, minY, maxY;
+    const scaledWidth = mapDimensions.width * newZoom;
+    const scaledHeight = mapDimensions.height * newZoom;
+
+    if (scaledWidth > screenW) {
+      minX = screenW - scaledWidth;
+      maxX = 0;
+    } else {
+      minX = (screenW - scaledWidth) / 2;
+      maxX = (screenW - scaledWidth) / 2;
+    }
+
+    if (scaledHeight > screenH) {
+      minY = screenH - scaledHeight;
+      maxY = 0;
+    } else {
+      minY = (screenH - scaledHeight) / 2;
+      maxY = (screenH - scaledHeight) / 2;
+    }
+
+    newPanX = Math.max(minX, Math.min(maxX, newPanX));
+    newPanY = Math.max(minY, Math.min(maxY, newPanY));
+    
+    setZoom(newZoom);
+    setPan({ x: newPanX, y: newPanY });
   };
 
   const snapToGrid = (val) => Math.floor(val / GRID_SIZE) * GRID_SIZE + (GRID_SIZE / 2);
@@ -106,8 +167,8 @@ export default function LocalMap({
       if (dragToken.type === 'player') {
         const token = playerTokens.find(t => t.id === dragToken.id);
         if (token) {
-          let nx = (token.localX ?? (mapDimensions.width / 2)) + dx;
-          let ny = (token.localY ?? (mapDimensions.height / 2)) + dy;
+          let nx = (token.localX ?? (mapDimensions.width / 2)) + dx / zoom;
+          let ny = (token.localY ?? (mapDimensions.height / 2)) + dy / zoom;
           nx = Math.max(0, Math.min(mapDimensions.width, nx));
           ny = Math.max(0, Math.min(mapDimensions.height, ny));
           
@@ -116,8 +177,8 @@ export default function LocalMap({
       } else {
         const token = dmTokens.find(t => t.id === dragToken.id);
         if (token) {
-          let nx = (token.localX ?? (mapDimensions.width / 2)) + dx;
-          let ny = (token.localY ?? (mapDimensions.height / 2)) + dy;
+          let nx = (token.localX ?? (mapDimensions.width / 2)) + dx / zoom;
+          let ny = (token.localY ?? (mapDimensions.height / 2)) + dy / zoom;
           nx = Math.max(0, Math.min(mapDimensions.width, nx));
           ny = Math.max(0, Math.min(mapDimensions.height, ny));
           
@@ -170,6 +231,7 @@ export default function LocalMap({
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
+      onWheel={handleWheel}
     >
       <div 
         className="local-map-world"
@@ -180,7 +242,9 @@ export default function LocalMap({
           width: mapDimensions.width,
           height: mapDimensions.height,
           backgroundColor: '#1a1a1a',
-          boxShadow: '0 0 100px rgba(0,0,0,0.8)'
+          boxShadow: '0 0 100px rgba(0,0,0,0.8)',
+          transform: `scale(${zoom})`,
+          transformOrigin: '0 0'
         }}
       >
         {hex.localImage && (
@@ -218,7 +282,21 @@ export default function LocalMap({
         {Object.entries(persistentLocalPings || {}).map(([key, p]) => (
            <React.Fragment key={`pp-${key}`}>
              <div className="persistent-ping" style={{ left: p.localX, top: p.localY, '--ping-color': p.color, '--ping-speed': p.speed || '2s' }} />
-             <div className="persistent-ping-core" style={{ left: p.localX, top: p.localY, '--ping-color': p.color }} />
+             {isDM && pingMode === 'persistent' && (
+               <div style={{ position: 'absolute', left: p.localX, top: p.localY, transform: 'translate(-50%, -50%)', zIndex: 100, cursor: 'pointer', background: 'rgba(0,0,0,0.5)', borderRadius: '50%', padding: '4px', pointerEvents: 'auto' }} 
+               onMouseDown={(e) => {
+                   e.stopPropagation();
+                   if (onLocalPing) {
+                     // Hack to trigger deletion via onLocalPing 
+                     // Wait, since persistentLocalPings are managed in the parent, we should pass a specific delete callback or handle it.
+                     // The parent handles it in onLocalPing if mode is 'persistent' by toggling!
+                     // If we pass the exact localX and localY, it will toggle it off.
+                     onLocalPing(p.localX, p.localY, 'persistent');
+                   }
+               }}>
+                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+               </div>
+             )}
            </React.Fragment>
         ))}
 
@@ -227,8 +305,8 @@ export default function LocalMap({
           const isDragging = dragToken?.id === t.id && dragToken?.type === 'dm';
           const dx = isDragging ? dragToken.currentX - dragToken.startX : 0;
           const dy = isDragging ? dragToken.currentY - dragToken.startY : 0;
-          let lx = (t.localX ?? (mapDimensions.width / 2)) + dx;
-          let ly = (t.localY ?? (mapDimensions.height / 2)) + dy;
+          let lx = (t.localX ?? (mapDimensions.width / 2)) + dx / zoom;
+          let ly = (t.localY ?? (mapDimensions.height / 2)) + dy / zoom;
           
           if (!isDragging && (t.localX === undefined || t.localY === undefined)) {
             lx = snapToGrid(lx);
@@ -262,8 +340,8 @@ export default function LocalMap({
           const isDragging = dragToken?.id === t.id && dragToken?.type === 'player';
           const dx = isDragging ? dragToken.currentX - dragToken.startX : 0;
           const dy = isDragging ? dragToken.currentY - dragToken.startY : 0;
-          let lx = (t.localX ?? (mapDimensions.width / 2)) + dx;
-          let ly = (t.localY ?? (mapDimensions.height / 2)) + dy;
+          let lx = (t.localX ?? (mapDimensions.width / 2)) + dx / zoom;
+          let ly = (t.localY ?? (mapDimensions.height / 2)) + dy / zoom;
           
           if (!isDragging && (t.localX === undefined || t.localY === undefined)) {
             lx = snapToGrid(lx);
@@ -297,16 +375,16 @@ export default function LocalMap({
 
       {/* Header UI */}
       <div style={{ position: 'absolute', top: 24, left: 24, zIndex: 100, display: 'flex', gap: '12px' }}>
-        <button className="status-badge" style={{ cursor: 'pointer', color: '#ff5555', background: 'transparent', border: '1px solid rgba(255,85,85,0.3)' }} onClick={onExit}>
+        <button className="ghost-btn danger-btn" onClick={onExit}>
            Exit Local Map
         </button>
         {isDM && (
           <>
-            <div className="status-badge library-upload-btn-wrap" style={{ cursor: 'pointer', color: '#fff', border: '1px solid rgba(255,255,255,0.3)' }}>
+            <div className="ghost-btn library-upload-btn-wrap" style={{ cursor: 'pointer' }}>
               Change Image
               <input type="file" accept="image/*" onChange={handleImageUpload} />
             </div>
-            <button className="status-badge" style={{ cursor: 'pointer', color: '#ccc', border: '1px solid rgba(255,255,255,0.2)' }} onClick={() => setIsSettingsOpen(true)}>
+            <button className="ghost-btn" onClick={() => setIsSettingsOpen(true)}>
               Map Size Settings
             </button>
           </>
@@ -315,29 +393,28 @@ export default function LocalMap({
       
       {/* Settings Modal */}
       {isDM && isSettingsOpen && (
-        <div style={{
-          position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
-          background: 'rgba(15,15,15,0.95)', padding: '24px', borderRadius: '16px',
-          border: '1px solid rgba(255,255,255,0.1)', zIndex: 200, display: 'flex', flexDirection: 'column', gap: '16px',
-          width: '320px', boxShadow: '0 20px 40px rgba(0,0,0,0.8)', backdropFilter: 'blur(20px)'
-        }} onMouseDown={e => e.stopPropagation()}>
-          <h3 style={{ margin: 0, color: '#fff' }}>Local Map Settings</h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <label style={{ color: '#aaa', fontSize: '0.85rem' }}>Width (in Squares):</label>
-            <input type="number" className="room-input" value={gridWidth} onChange={e => setGridWidth(parseInt(e.target.value) || 1)} style={{ marginBottom: 0 }} />
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <label style={{ color: '#aaa', fontSize: '0.85rem' }}>Height (in Squares):</label>
-            <input type="number" className="room-input" value={gridHeight} onChange={e => setGridHeight(parseInt(e.target.value) || 1)} style={{ marginBottom: 0 }} />
-          </div>
-          <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
-            <button style={{ flex: 1, padding: '10px', background: 'rgba(255,255,255,0.1)', border: 'none', color: '#fff', borderRadius: '8px', cursor: 'pointer' }} onClick={() => setIsSettingsOpen(false)}>Cancel</button>
-            <button style={{ flex: 1, padding: '10px', background: 'rgba(85,255,85,0.2)', border: '1px solid rgba(85,255,85,0.5)', color: '#55ff55', borderRadius: '8px', cursor: 'pointer' }} onClick={() => {
-              if (onUpdateLocalSettings) {
-                onUpdateLocalSettings({ localWidth: gridWidth * GRID_SIZE, localHeight: gridHeight * GRID_SIZE });
-              }
-              setIsSettingsOpen(false);
-            }}>Apply Size</button>
+        <div className="image-modal">
+          <div className="modal-shell">
+            <div className="modal-content" style={{ zIndex: 200, display: 'flex', flexDirection: 'column', gap: '16px' }} onMouseDown={e => e.stopPropagation()}>
+              <h3>Local Map Settings</h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <label style={{ color: '#aaa', fontSize: '0.85rem' }}>Width (in Squares):</label>
+                <input type="number" className="room-input" value={gridWidth} onChange={e => setGridWidth(parseInt(e.target.value) || 1)} style={{ marginBottom: 0 }} />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <label style={{ color: '#aaa', fontSize: '0.85rem' }}>Height (in Squares):</label>
+                <input type="number" className="room-input" value={gridHeight} onChange={e => setGridHeight(parseInt(e.target.value) || 1)} style={{ marginBottom: 0 }} />
+              </div>
+              <div className="action-buttons" style={{ marginTop: '8px' }}>
+                <button className="primary-btn" onClick={() => {
+                  if (onUpdateLocalSettings) {
+                    onUpdateLocalSettings({ localWidth: gridWidth * GRID_SIZE, localHeight: gridHeight * GRID_SIZE });
+                  }
+                  setIsSettingsOpen(false);
+                }}>Apply Size</button>
+                <button className="ghost-btn" onClick={() => setIsSettingsOpen(false)}>Cancel</button>
+              </div>
+            </div>
           </div>
         </div>
       )}
