@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import DiceBox from '@3d-dice/dice-box';
 import { GiD4, GiDiceSixFacesSix, GiDiceEightFacesEight, GiD10, GiD12, GiDiceTwentyFacesTwenty } from 'react-icons/gi';
-import { FaPercent, FaPalette } from 'react-icons/fa';
+import { FaPercent, FaPalette, FaEye, FaEyeSlash, FaLock } from 'react-icons/fa';
 
 export default function DiceRoller({ playerColor, playerName, onRollBroadcast, incomingRoll, hideControls }) {
   const containerRef = useRef(null);
@@ -14,6 +14,7 @@ export default function DiceRoller({ playerColor, playerName, onRollBroadcast, i
   
   const [activeTheme, setActiveTheme] = useState('default');
   const [isThemeMenuOpen, setIsThemeMenuOpen] = useState(false);
+  const [isPrivate, setIsPrivate] = useState(false);
   
   // Create a unique ID for the container so we can pass a CSS selector to DiceBox
   const containerId = useRef(`dice-box-${Math.random().toString(36).substr(2, 9)}`);
@@ -91,10 +92,11 @@ export default function DiceRoller({ playerColor, playerName, onRollBroadcast, i
             notation: ctx.notation,
             results: individualRolls,
             total,
-            color: ctx.color
+            color: ctx.color,
+            isPrivate: ctx.isPrivate
           });
 
-          if (onRollBroadcast) {
+          if (onRollBroadcast && !ctx.isPrivate) {
             onRollBroadcast({
               type: 'dice_roll',
               player: playerName || 'Unknown',
@@ -168,7 +170,7 @@ export default function DiceRoller({ playerColor, playerName, onRollBroadcast, i
     }
 
     const notation = `${nQty}${type}`;
-    localRollContext.current = { notation, type, color: playerColor || '#ff5555' };
+    localRollContext.current = { notation, type, color: playerColor || '#ff5555', isPrivate };
     diceBoxRef.current.roll(notation).catch(e => {
         console.error("Roll error", e);
         setIsRolling(false);
@@ -233,6 +235,17 @@ export default function DiceRoller({ playerColor, playerName, onRollBroadcast, i
               </div>
             ))}
 
+            {/* Private Roll Toggle */}
+            <div className="dice-stack-item">
+              <button 
+                className={`dice-type-btn ${isPrivate ? 'active' : ''}`}
+                onClick={() => { setIsPrivate(!isPrivate); setSelectedDice(null); setIsThemeMenuOpen(false); }}
+                title={isPrivate ? "Private Rolls: ON (Players won't see)" : "Private Rolls: OFF (Broadcast to players)"}
+              >
+                {isPrivate ? <FaEyeSlash size={22} /> : <FaEye size={22} />}
+              </button>
+            </div>
+
             {/* Theme Picker Button */}
             <div className="dice-stack-item">
               <button 
@@ -288,7 +301,10 @@ export default function DiceRoller({ playerColor, playerName, onRollBroadcast, i
               {getDiceIcon(t.type, 24)}
             </div>
             <div className="toast-content">
-              <div className="toast-player">{t.player}</div>
+              <div className="toast-player">
+                {t.player}
+                {t.isPrivate && <FaLock size={12} style={{ marginLeft: '6px', opacity: 0.5 }} title="Private Roll" />}
+              </div>
               <div className="toast-result">
                 <span className="toast-notation">{t.notation}</span>
                 {t.results.length > 1 ? (
