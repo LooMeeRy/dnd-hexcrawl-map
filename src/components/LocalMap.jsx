@@ -10,13 +10,35 @@ export default function LocalMap({
   isDM,
   onUpdateLocalImage
 }) {
-  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [pan, setPan] = useState({ x: typeof window !== 'undefined' ? window.innerWidth / 2 - 800 : 0, y: typeof window !== 'undefined' ? window.innerHeight / 2 - 800 : 0 });
   const [isPanning, setIsPanning] = useState(false);
   const [startPan, setStartPan] = useState({ x: 0, y: 0 });
+  const [mapDimensions, setMapDimensions] = useState({ width: 1600, height: 1600 });
   const containerRef = useRef(null);
 
   // Dragging token
   const [dragToken, setDragToken] = useState(null); // { id, type: 'player' | 'dm', startX, startY, currentX, currentY }
+
+  const GRID_SIZE = 80;
+
+  useEffect(() => {
+    if (hex.localImage) {
+      const img = new Image();
+      img.onload = () => {
+        setMapDimensions({ width: img.width, height: img.height });
+        if (typeof window !== 'undefined') {
+          // Center the newly loaded map
+          setPan({ x: window.innerWidth / 2 - img.width / 2, y: window.innerHeight / 2 - img.height / 2 });
+        }
+      };
+      img.src = hex.localImage;
+    } else {
+      setMapDimensions({ width: 1600, height: 1600 });
+      if (typeof window !== 'undefined') {
+        setPan({ x: window.innerWidth / 2 - 800, y: window.innerHeight / 2 - 800 });
+      }
+    }
+  }, [hex.localImage]);
 
   const handleMouseDown = (e) => {
     if (e.button !== 0) return;
@@ -30,9 +52,28 @@ export default function LocalMap({
       return;
     }
     if (isPanning) {
-      setPan({ x: e.clientX - startPan.x, y: e.clientY - startPan.y });
+      let newX = e.clientX - startPan.x;
+      let newY = e.clientY - startPan.y;
+      
+      const screenW = window.innerWidth;
+      const screenH = window.innerHeight;
+      
+      const paddingX = screenW / 2;
+      const paddingY = screenH / 2;
+      
+      const minX = paddingX - mapDimensions.width;
+      const maxX = paddingX;
+      const minY = paddingY - mapDimensions.height;
+      const maxY = paddingY;
+
+      newX = Math.max(minX, Math.min(maxX, newX));
+      newY = Math.max(minY, Math.min(maxY, newY));
+
+      setPan({ x: newX, y: newY });
     }
   };
+
+  const snapToGrid = (val) => Math.floor(val / GRID_SIZE) * GRID_SIZE + (GRID_SIZE / 2);
 
   const handleMouseUp = () => {
     if (isPanning) setIsPanning(false);
@@ -43,25 +84,28 @@ export default function LocalMap({
       if (dragToken.type === 'player') {
         const token = playerTokens.find(t => t.id === dragToken.id);
         if (token) {
-          onUpdatePlayerToken(dragToken.id, { 
-            localX: (token.localX || 0) + dx, 
-            localY: (token.localY || 0) + dy 
-          });
+          let nx = (token.localX ?? (mapDimensions.width / 2)) + dx;
+          let ny = (token.localY ?? (mapDimensions.height / 2)) + dy;
+          nx = Math.max(0, Math.min(mapDimensions.width, nx));
+          ny = Math.max(0, Math.min(mapDimensions.height, ny));
+          
+          onUpdatePlayerToken(dragToken.id, { localX: snapToGrid(nx), localY: snapToGrid(ny) });
         }
       } else {
         const token = dmTokens.find(t => t.id === dragToken.id);
         if (token) {
-          onUpdateDmToken(dragToken.id, { 
-            localX: (token.localX || 0) + dx, 
-            localY: (token.localY || 0) + dy 
-          });
+          let nx = (token.localX ?? (mapDimensions.width / 2)) + dx;
+          let ny = (token.localY ?? (mapDimensions.height / 2)) + dy;
+          nx = Math.max(0, Math.min(mapDimensions.width, nx));
+          ny = Math.max(0, Math.min(mapDimensions.height, ny));
+          
+          onUpdateDmToken(dragToken.id, { localX: snapToGrid(nx), localY: snapToGrid(ny) });
         }
       }
       setDragToken(null);
     }
   };
 
-  // Image Upload for DM
   const handleImageUpload = (e) => {
     if (!isDM) return;
     const file = e.target.files[0];
@@ -74,21 +118,13 @@ export default function LocalMap({
     e.target.value = '';
   };
 
-  // The center of our infinite canvas is virtually at 0,0.
-  // We offset it so 0,0 is in the middle of the screen.
-  const screenCenterX = typeof window !== 'undefined' ? window.innerWidth / 2 : 500;
-  const screenCenterY = typeof window !== 'undefined' ? window.innerHeight / 2 : 500;
-
   return (
     <div 
       className="local-map-container"
       ref={containerRef}
       style={{
         position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-        backgroundColor: '#1a1a1a',
-        backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.1) 1px, transparent 1px)',
-        backgroundSize: '40px 40px',
-        backgroundPosition: `${pan.x}px ${pan.y}px`,
+        backgroundColor: '#111',
         overflow: 'hidden',
         zIndex: 50,
         cursor: isPanning ? 'grabbing' : 'grab'
@@ -102,19 +138,27 @@ export default function LocalMap({
         className="local-map-world"
         style={{
           position: 'absolute',
-          left: screenCenterX + pan.x,
-          top: screenCenterY + pan.y,
+          left: pan.x,
+          top: pan.y,
+          width: mapDimensions.width,
+          height: mapDimensions.height,
+          backgroundColor: '#1a1a1a',
+          backgroundImage: `
+            linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px)
+          `,
+          backgroundSize: `${GRID_SIZE}px ${GRID_SIZE}px`,
+          boxShadow: '0 0 100px rgba(0,0,0,0.8)'
         }}
       >
-        {/* Background Image if set */}
         {hex.localImage && (
           <img 
             src={hex.localImage} 
             alt="Local Map Background" 
             style={{
               position: 'absolute',
-              transform: 'translate(-50%, -50%)',
-              maxWidth: 'none',
+              top: 0, left: 0,
+              width: '100%', height: '100%',
               pointerEvents: 'none',
               opacity: 0.8,
               zIndex: 0
@@ -127,8 +171,13 @@ export default function LocalMap({
           const isDragging = dragToken?.id === t.id && dragToken?.type === 'dm';
           const dx = isDragging ? dragToken.currentX - dragToken.startX : 0;
           const dy = isDragging ? dragToken.currentY - dragToken.startY : 0;
-          const lx = (t.localX || 0) + dx;
-          const ly = (t.localY || 0) + dy;
+          let lx = (t.localX ?? (mapDimensions.width / 2)) + dx;
+          let ly = (t.localY ?? (mapDimensions.height / 2)) + dy;
+          
+          if (!isDragging && (t.localX === undefined || t.localY === undefined)) {
+            lx = snapToGrid(lx);
+            ly = snapToGrid(ly);
+          }
           
           return (
             <div 
@@ -138,7 +187,8 @@ export default function LocalMap({
                 left: lx, top: ly,
                 transform: 'translate(-50%, -50%)',
                 zIndex: 10,
-                cursor: isDM ? (isDragging ? 'grabbing' : 'grab') : 'default'
+                cursor: isDM ? (isDragging ? 'grabbing' : 'grab') : 'default',
+                transition: isDragging ? 'none' : 'left 0.2s ease-out, top 0.2s ease-out'
               }}
               onMouseDown={(e) => {
                 if (!isDM) return;
@@ -156,12 +206,13 @@ export default function LocalMap({
           const isDragging = dragToken?.id === t.id && dragToken?.type === 'player';
           const dx = isDragging ? dragToken.currentX - dragToken.startX : 0;
           const dy = isDragging ? dragToken.currentY - dragToken.startY : 0;
-          const lx = (t.localX || 0) + dx;
-          const ly = (t.localY || 0) + dy;
-          // Determine if this user can drag this token.
-          // For now, DM can drag any, Player can drag their own?
-          // Since we just pass onUpdatePlayerToken, let's assume the parent handles permissions, or we just allow it if they can fire the event.
-          // If this is PlayerView, they shouldn't drag other players unless allowed. We'll rely on the parent or just let them drag.
+          let lx = (t.localX ?? (mapDimensions.width / 2)) + dx;
+          let ly = (t.localY ?? (mapDimensions.height / 2)) + dy;
+          
+          if (!isDragging && (t.localX === undefined || t.localY === undefined)) {
+            lx = snapToGrid(lx);
+            ly = snapToGrid(ly);
+          }
           
           return (
             <div 
@@ -171,7 +222,8 @@ export default function LocalMap({
                 left: lx, top: ly,
                 transform: 'translate(-50%, -50%)',
                 zIndex: 20,
-                cursor: isDragging ? 'grabbing' : 'grab'
+                cursor: isDragging ? 'grabbing' : 'grab',
+                transition: isDragging ? 'none' : 'left 0.2s ease-out, top 0.2s ease-out'
               }}
               onMouseDown={(e) => {
                 e.stopPropagation();
@@ -188,27 +240,14 @@ export default function LocalMap({
       </div>
 
       {/* UI Overlay */}
-      <div style={{ position: 'absolute', top: '20px', left: '20px', zIndex: 100, display: 'flex', gap: '12px' }}>
-        <button 
-          onClick={onExit}
-          style={{
-            padding: '10px 20px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.2)',
-            background: 'rgba(20,20,20,0.8)', color: 'white', cursor: 'pointer',
-            backdropFilter: 'blur(10px)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
-          }}
-        >
+      <div style={{ position: 'absolute', top: '24px', left: '24px', zIndex: 100, display: 'flex', gap: '12px', alignItems: 'center' }}>
+        <button className="ghost-btn" onClick={onExit} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 18l-6-6 6-6"/></svg>
           Exit to World Map
         </button>
 
         {isDM && (
-          <label style={{
-            padding: '10px 20px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.2)',
-            background: 'rgba(255,255,255,0.1)', color: 'white', cursor: 'pointer',
-            backdropFilter: 'blur(10px)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
-          }}>
+          <label className="status-badge" style={{ cursor: 'pointer', color: 'white', borderColor: 'rgba(255,255,255,0.3)', display: 'flex', alignItems: 'center', gap: '8px' }}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
             Upload Background
             <input type="file" accept="image/*" style={{ display: 'none' }} onChange={handleImageUpload} />
@@ -216,8 +255,8 @@ export default function LocalMap({
         )}
       </div>
       
-      <div style={{ position: 'absolute', top: '20px', right: '20px', zIndex: 100 }}>
-        <div className="status-badge" style={{ background: 'rgba(0,0,0,0.7)' }}>
+      <div style={{ position: 'absolute', top: '24px', right: '24px', zIndex: 100 }}>
+        <div className="status-badge">
           Local Map: Hex [{hex.q}, {hex.r}]
         </div>
       </div>
