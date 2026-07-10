@@ -328,11 +328,8 @@ export default function LocalMap({
                onMouseDown={(e) => {
                    e.stopPropagation();
                    if (onLocalPing) {
-                     // Hack to trigger deletion via onLocalPing 
-                     // Wait, since persistentLocalPings are managed in the parent, we should pass a specific delete callback or handle it.
-                     // The parent handles it in onLocalPing if mode is 'persistent' by toggling!
-                     // If we pass the exact localX and localY, it will toggle it off.
-                     onLocalPing(p.localX, p.localY, 'persistent');
+                     // Pass the exact key to ensure it deletes the correct ping
+                     onLocalPing(p.localX, p.localY, 'persistent', key);
                    }
                }}>
                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg>

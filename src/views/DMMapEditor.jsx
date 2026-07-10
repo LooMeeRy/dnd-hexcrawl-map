@@ -487,16 +487,16 @@ export default function DMMapEditor() {
                 return { ...prev, [key]: { ...hex, ...settings } };
              });
           }}
-          onLocalPing={(lx, ly, mode) => {
+          onLocalPing={(lx, ly, mode, explicitKey) => {
              if (mode === 'normal' || mode === 'force_focus') {
                const pid = Date.now() + Math.random();
                setActiveLocalPings(prev => [...prev, { id: pid, localX: lx, localY: ly, color: dmPingColor }]);
                setTimeout(() => setActiveLocalPings(prev => prev.filter(p => p.id !== pid)), 1000);
                if (mqttClient && roomCode) {
-                 mqttClient.publish(`dnd-room/${roomCode}/events`, JSON.stringify({ type: mode === 'normal' ? 'local_ping' : 'local_force_focus', localX: lx, localY: ly, color: dmPingColor }));
+                 mqttClient.publish(`dnd-room/${roomCode}/events`, JSON.stringify({ type: mode === 'normal' ? 'local_ping' : 'local_force_focus', localX: lx, localY: ly, color: dmPingColor, q: activeLocalHex.q, r: activeLocalHex.r }));
                }
              } else if (mode === 'persistent') {
-               const key = `${activeLocalHex.q},${activeLocalHex.r}_${Math.round(lx)},${Math.round(ly)}`;
+               const key = explicitKey || `${activeLocalHex.q},${activeLocalHex.r}_${Math.round(lx)},${Math.round(ly)}`;
                setPersistentLocalPings(prev => {
                   const next = {...prev};
                   if (next[key]) delete next[key];

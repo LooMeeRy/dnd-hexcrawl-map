@@ -172,11 +172,28 @@ export default function PlayerView() {
             setTimeout(() => { setActivePings(prev => prev.filter(p => p.id !== newPing.id)); }, 1000);
             if (event.type === 'force_focus') setCameraTarget({ q: event.q, r: event.r });
           } else if (event.type === 'local_ping' || event.type === 'local_force_focus') {
+            const myToken = playerTokens[myPlayerId];
+            const isMyTokenHere = myToken && myToken.q === event.q && myToken.r === event.r;
+            // Check if activeLocalHex is already defined, or we can look it up from localStorage if it's not in state scope here?
+            // Actually, we can just use the state directly. But inside useEffect closure, activeLocalHex might be stale if we don't include it in deps.
+            // Let's use a functional update or ref for activeLocalHex if we need, or just include it in deps.
+            // Wait, we don't have activeLocalHex in deps. Let's just always process the ping for activeLocalPings,
+            // because if activeLocalHex is different, the ping won't render anyway!
+            // BUT for `local_force_focus`, we want to auto-switch if they have a token there.
+            if (event.type === 'local_force_focus' && isMyTokenHere) {
+               setActiveLocalHex({ q: event.q, r: event.r });
+               setViewMode('local');
+            }
+            
             const newPing = { id: Date.now() + Math.random(), localX: event.localX, localY: event.localY, color: event.color || '#ff5555' };
             setActiveLocalPings(prev => [...prev, newPing]);
             setTimeout(() => setActiveLocalPings(prev => prev.filter(p => p.id !== newPing.id)), 1000);
+            
             if (event.type === 'local_force_focus') {
-               setLocalCameraTarget({ localX: event.localX, localY: event.localY, _t: Date.now() });
+               // Only trigger camera move if the token is there (meaning they are in or switching to that map)
+               if (isMyTokenHere) {
+                 setLocalCameraTarget({ localX: event.localX, localY: event.localY, _t: Date.now() });
+               }
             }
           } else if (event.type === 'dice_roll') {
             setIncomingRoll(event);
@@ -195,7 +212,7 @@ export default function PlayerView() {
       if (pingInterval) clearInterval(pingInterval);
       client.end();
     };
-  }, [roomCode, myPlayerId]);
+  }, [roomCode, myPlayerId, playerTokens]);
 
   useEffect(() => {
     if (!campaignId) return;
@@ -390,7 +407,7 @@ export default function PlayerView() {
              setActiveLocalPings(prev => [...prev, { id: pid, localX: lx, localY: ly, color: playerColor }]);
              setTimeout(() => setActiveLocalPings(prev => prev.filter(p => p.id !== pid)), 1000);
              if (mqttClientRef.current && roomCode) {
-               mqttClientRef.current.publish(`dnd-room/${roomCode}/action`, JSON.stringify({ type: 'local_ping', localX: lx, localY: ly, color: playerColor }));
+               mqttClientRef.current.publish(`dnd-room/${roomCode}/action`, JSON.stringify({ type: 'local_ping', localX: lx, localY: ly, color: playerColor, q: activeLocalHex.q, r: activeLocalHex.r }));
              } else {
                localStorage.setItem('dnd-local-local-ping', JSON.stringify({ localX: lx, localY: ly, color: playerColor, _t: Date.now() }));
              }
