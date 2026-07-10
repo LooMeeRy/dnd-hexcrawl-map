@@ -27,6 +27,7 @@ export default function PlayerView() {
   const [activeLocalPings, setActiveLocalPings] = useState([]);
   const [localCameraTarget, setLocalCameraTarget] = useState(null);
   const [incomingRoll, setIncomingRoll] = useState(null);
+  const playerTokensRef = useRef({});
   
   const [cameraTarget, setCameraTarget] = useState({ q: 0, r: 0 });
   const [hasFocused, setHasFocused] = useState(false);
@@ -103,6 +104,10 @@ export default function PlayerView() {
   }, [roomCode]);
 
   useEffect(() => {
+    playerTokensRef.current = playerTokens;
+  }, [playerTokens]);
+
+  useEffect(() => {
     if (!roomCode) return;
     
     setStatus('Looking for DM...');
@@ -172,7 +177,7 @@ export default function PlayerView() {
             setTimeout(() => { setActivePings(prev => prev.filter(p => p.id !== newPing.id)); }, 1000);
             if (event.type === 'force_focus') setCameraTarget({ q: event.q, r: event.r });
           } else if (event.type === 'local_ping' || event.type === 'local_force_focus') {
-            const myToken = playerTokens[myPlayerId];
+            const myToken = playerTokensRef.current[myPlayerId];
             const isMyTokenHere = myToken && myToken.q === event.q && myToken.r === event.r;
             // Check if activeLocalHex is already defined, or we can look it up from localStorage if it's not in state scope here?
             // Actually, we can just use the state directly. But inside useEffect closure, activeLocalHex might be stale if we don't include it in deps.
@@ -212,7 +217,7 @@ export default function PlayerView() {
       if (pingInterval) clearInterval(pingInterval);
       client.end();
     };
-  }, [roomCode, myPlayerId, playerTokens]);
+  }, [roomCode, myPlayerId]);
 
   useEffect(() => {
     if (!campaignId) return;
