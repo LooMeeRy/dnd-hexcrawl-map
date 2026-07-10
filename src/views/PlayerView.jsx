@@ -25,6 +25,7 @@ export default function PlayerView() {
   const [persistentLocalPings, setPersistentLocalPings] = useState({});
   const [activePings, setActivePings] = useState([]);
   const [activeLocalPings, setActiveLocalPings] = useState([]);
+  const [localCameraTarget, setLocalCameraTarget] = useState(null);
   const [incomingRoll, setIncomingRoll] = useState(null);
   
   const [cameraTarget, setCameraTarget] = useState({ q: 0, r: 0 });
@@ -170,10 +171,13 @@ export default function PlayerView() {
             setActivePings(prev => [...prev, newPing]);
             setTimeout(() => { setActivePings(prev => prev.filter(p => p.id !== newPing.id)); }, 1000);
             if (event.type === 'force_focus') setCameraTarget({ q: event.q, r: event.r });
-          } else if (event.type === 'local_ping') {
+          } else if (event.type === 'local_ping' || event.type === 'local_force_focus') {
             const newPing = { id: Date.now() + Math.random(), localX: event.localX, localY: event.localY, color: event.color || '#ff5555' };
             setActiveLocalPings(prev => [...prev, newPing]);
             setTimeout(() => setActiveLocalPings(prev => prev.filter(p => p.id !== newPing.id)), 1000);
+            if (event.type === 'local_force_focus') {
+               setLocalCameraTarget({ localX: event.localX, localY: event.localY, _t: Date.now() });
+            }
           } else if (event.type === 'dice_roll') {
             setIncomingRoll(event);
           }
@@ -393,6 +397,7 @@ export default function PlayerView() {
           }}
           activeLocalPings={activeLocalPings}
           persistentLocalPings={persistentLocalPings}
+          localCameraTarget={localCameraTarget}
           onExit={() => { setViewMode('macro'); setActiveLocalHex(null); }}
         />
       ) : (

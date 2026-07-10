@@ -14,7 +14,8 @@ export default function LocalMap({
   persistentLocalPings = {},
   pingMode = 'none',
   onSetPingMode,
-  onUpdateLocalSettings
+  onUpdateLocalSettings,
+  localCameraTarget
 }) {
   const [pan, setPan] = useState({ x: typeof window !== 'undefined' ? window.innerWidth / 2 - 800 : 0, y: typeof window !== 'undefined' ? window.innerHeight / 2 - 800 : 0 });
   const [zoom, setZoom] = useState(1);
@@ -189,6 +190,45 @@ export default function LocalMap({
     }
   };
 
+  useEffect(() => {
+    if (localCameraTarget && typeof window !== 'undefined') {
+      const screenW = window.innerWidth;
+      const screenH = window.innerHeight;
+      
+      const targetZoom = Math.max(zoom, 1.5); // Zoom in if too far out
+      
+      const scaledWidth = mapDimensions.width * targetZoom;
+      const scaledHeight = mapDimensions.height * targetZoom;
+      
+      let newPanX = (screenW / 2) - (localCameraTarget.localX * targetZoom);
+      let newPanY = (screenH / 2) - (localCameraTarget.localY * targetZoom);
+      
+      let minX, maxX, minY, maxY;
+      
+      if (scaledWidth > screenW) {
+        minX = screenW - scaledWidth;
+        maxX = 0;
+      } else {
+        minX = (screenW - scaledWidth) / 2;
+        maxX = (screenW - scaledWidth) / 2;
+      }
+
+      if (scaledHeight > screenH) {
+        minY = screenH - scaledHeight;
+        maxY = 0;
+      } else {
+        minY = (screenH - scaledHeight) / 2;
+        maxY = (screenH - scaledHeight) / 2;
+      }
+
+      newPanX = Math.max(minX, Math.min(maxX, newPanX));
+      newPanY = Math.max(minY, Math.min(maxY, newPanY));
+      
+      setZoom(targetZoom);
+      setPan({ x: newPanX, y: newPanY });
+    }
+  }, [localCameraTarget, mapDimensions]);
+
   const handleImageUpload = (e) => {
     if (!isDM) return;
     const file = e.target.files[0];
@@ -244,7 +284,8 @@ export default function LocalMap({
           backgroundColor: '#1a1a1a',
           boxShadow: '0 0 100px rgba(0,0,0,0.8)',
           transform: `scale(${zoom})`,
-          transformOrigin: '0 0'
+          transformOrigin: '0 0',
+          transition: isPanning ? 'none' : 'left 0.5s cubic-bezier(0.16, 1, 0.3, 1), top 0.5s cubic-bezier(0.16, 1, 0.3, 1), transform 0.5s cubic-bezier(0.16, 1, 0.3, 1)'
         }}
       >
         {hex.localImage && (
