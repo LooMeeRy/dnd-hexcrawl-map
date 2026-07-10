@@ -507,7 +507,7 @@ export default function DMMapEditor() {
              }
           }}
           activeLocalPings={activeLocalPings}
-          persistentLocalPings={Object.fromEntries(Object.entries(persistentLocalPings).filter(([k, p]) => p.q === activeLocalHex.q && p.r === activeLocalHex.r))}
+          persistentLocalPings={Object.fromEntries(Object.entries(persistentLocalPings).filter(([k, p]) => k.startsWith(`${activeLocalHex.q},${activeLocalHex.r}_`)))}
           pingMode={pingMode}
           onSetPingMode={setPingMode}
           onExit={() => { setViewMode('macro'); setActiveLocalHex(null); }}
