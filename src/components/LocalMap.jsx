@@ -13,12 +13,16 @@ export default function LocalMap({
   activeLocalPings = [],
   persistentLocalPings = {},
   pingMode = 'none',
-  onSetPingMode
+  onSetPingMode,
+  onUpdateLocalSettings
 }) {
   const [pan, setPan] = useState({ x: typeof window !== 'undefined' ? window.innerWidth / 2 - 800 : 0, y: typeof window !== 'undefined' ? window.innerHeight / 2 - 800 : 0 });
   const [isPanning, setIsPanning] = useState(false);
   const [startPan, setStartPan] = useState({ x: 0, y: 0 });
   const [mapDimensions, setMapDimensions] = useState({ width: 1600, height: 1600 });
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [gridWidth, setGridWidth] = useState(20);
+  const [gridHeight, setGridHeight] = useState(20);
   const containerRef = useRef(null);
 
   // Dragging token
@@ -27,23 +31,30 @@ export default function LocalMap({
   const GRID_SIZE = 80;
 
   useEffect(() => {
-    if (hex.localImage) {
+    if (hex.localWidth && hex.localHeight) {
+      setMapDimensions({ width: hex.localWidth, height: hex.localHeight });
+      setGridWidth(Math.round(hex.localWidth / GRID_SIZE));
+      setGridHeight(Math.round(hex.localHeight / GRID_SIZE));
+    } else if (hex.localImage) {
       const img = new Image();
       img.onload = () => {
         setMapDimensions({ width: img.width, height: img.height });
+        setGridWidth(Math.round(img.width / GRID_SIZE));
+        setGridHeight(Math.round(img.height / GRID_SIZE));
         if (typeof window !== 'undefined') {
-          // Center the newly loaded map
           setPan({ x: window.innerWidth / 2 - img.width / 2, y: window.innerHeight / 2 - img.height / 2 });
         }
       };
       img.src = hex.localImage;
     } else {
       setMapDimensions({ width: 1600, height: 1600 });
+      setGridWidth(20);
+      setGridHeight(20);
       if (typeof window !== 'undefined') {
         setPan({ x: window.innerWidth / 2 - 800, y: window.innerHeight / 2 - 800 });
       }
     }
-  }, [hex.localImage]);
+  }, [hex.localImage, hex.localWidth, hex.localHeight]);
 
   const handleMouseDown = (e) => {
     if (e.button !== 0) return;
@@ -284,21 +295,52 @@ export default function LocalMap({
         })}
       </div>
 
-      {/* UI Overlay */}
-      <div style={{ position: 'absolute', top: '24px', left: '24px', zIndex: 100, display: 'flex', gap: '12px', alignItems: 'center' }}>
-        <button className="ghost-btn" onClick={onExit} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 18l-6-6 6-6"/></svg>
-          Exit to World Map
+      {/* Header UI */}
+      <div style={{ position: 'absolute', top: 24, left: 24, zIndex: 100, display: 'flex', gap: '12px' }}>
+        <button className="status-badge" style={{ cursor: 'pointer', color: '#ff5555', background: 'transparent', border: '1px solid rgba(255,85,85,0.3)' }} onClick={onExit}>
+           Exit Local Map
         </button>
-
         {isDM && (
-          <label className="status-badge" style={{ cursor: 'pointer', color: 'white', borderColor: 'rgba(255,255,255,0.3)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
-            Upload Background
-            <input type="file" accept="image/*" style={{ display: 'none' }} onChange={handleImageUpload} />
-          </label>
+          <>
+            <div className="status-badge library-upload-btn-wrap" style={{ cursor: 'pointer', color: '#fff', border: '1px solid rgba(255,255,255,0.3)' }}>
+              Change Image
+              <input type="file" accept="image/*" onChange={handleImageUpload} />
+            </div>
+            <button className="status-badge" style={{ cursor: 'pointer', color: '#ccc', border: '1px solid rgba(255,255,255,0.2)' }} onClick={() => setIsSettingsOpen(true)}>
+              Map Size Settings
+            </button>
+          </>
         )}
       </div>
+      
+      {/* Settings Modal */}
+      {isDM && isSettingsOpen && (
+        <div style={{
+          position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
+          background: 'rgba(15,15,15,0.95)', padding: '24px', borderRadius: '16px',
+          border: '1px solid rgba(255,255,255,0.1)', zIndex: 200, display: 'flex', flexDirection: 'column', gap: '16px',
+          width: '320px', boxShadow: '0 20px 40px rgba(0,0,0,0.8)', backdropFilter: 'blur(20px)'
+        }} onMouseDown={e => e.stopPropagation()}>
+          <h3 style={{ margin: 0, color: '#fff' }}>Local Map Settings</h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <label style={{ color: '#aaa', fontSize: '0.85rem' }}>Width (in Squares):</label>
+            <input type="number" className="room-input" value={gridWidth} onChange={e => setGridWidth(parseInt(e.target.value) || 1)} style={{ marginBottom: 0 }} />
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <label style={{ color: '#aaa', fontSize: '0.85rem' }}>Height (in Squares):</label>
+            <input type="number" className="room-input" value={gridHeight} onChange={e => setGridHeight(parseInt(e.target.value) || 1)} style={{ marginBottom: 0 }} />
+          </div>
+          <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
+            <button style={{ flex: 1, padding: '10px', background: 'rgba(255,255,255,0.1)', border: 'none', color: '#fff', borderRadius: '8px', cursor: 'pointer' }} onClick={() => setIsSettingsOpen(false)}>Cancel</button>
+            <button style={{ flex: 1, padding: '10px', background: 'rgba(85,255,85,0.2)', border: '1px solid rgba(85,255,85,0.5)', color: '#55ff55', borderRadius: '8px', cursor: 'pointer' }} onClick={() => {
+              if (onUpdateLocalSettings) {
+                onUpdateLocalSettings({ localWidth: gridWidth * GRID_SIZE, localHeight: gridHeight * GRID_SIZE });
+              }
+              setIsSettingsOpen(false);
+            }}>Apply Size</button>
+          </div>
+        </div>
+      )}
       
       <div style={{ position: 'absolute', top: '24px', right: '24px', zIndex: 100 }}>
         <div className="status-badge">

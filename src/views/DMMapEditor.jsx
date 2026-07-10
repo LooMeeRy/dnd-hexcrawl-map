@@ -480,6 +480,13 @@ export default function DMMapEditor() {
                 return { ...prev, [key]: { ...hex, localImage: imageUrl } };
              });
           }}
+          onUpdateLocalSettings={(settings) => {
+             setActiveHexes(prev => {
+                const key = `${activeLocalHex.q},${activeLocalHex.r}`;
+                const hex = prev[key] || { q: activeLocalHex.q, r: activeLocalHex.r };
+                return { ...prev, [key]: { ...hex, ...settings } };
+             });
+          }}
           onLocalPing={(lx, ly, mode) => {
              if (mode === 'normal' || mode === 'force_focus') {
                const pid = Date.now() + Math.random();
