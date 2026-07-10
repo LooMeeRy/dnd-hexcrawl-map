@@ -8,7 +8,9 @@ export default function LocalMap({
   onUpdateDmToken, 
   onExit,
   isDM,
-  onUpdateLocalImage
+  onUpdateLocalImage,
+  onLocalPing,
+  activeLocalPings = []
 }) {
   const [pan, setPan] = useState({ x: typeof window !== 'undefined' ? window.innerWidth / 2 - 800 : 0, y: typeof window !== 'undefined' ? window.innerHeight / 2 - 800 : 0 });
   const [isPanning, setIsPanning] = useState(false);
@@ -42,6 +44,10 @@ export default function LocalMap({
 
   const handleMouseDown = (e) => {
     if (e.button !== 0) return;
+    if (e.altKey) {
+      if (onLocalPing) onLocalPing(e.clientX - pan.x, e.clientY - pan.y);
+      return;
+    }
     setIsPanning(true);
     setStartPan({ x: e.clientX - pan.x, y: e.clientY - pan.y });
   };
@@ -112,7 +118,22 @@ export default function LocalMap({
     if (!file) return;
     const reader = new FileReader();
     reader.onload = (event) => {
-      onUpdateLocalImage(event.target.result);
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX_SIZE = 1024;
+        let w = img.width; let h = img.height;
+        if (w > h) { 
+          if (w > MAX_SIZE) { h *= MAX_SIZE / w; w = MAX_SIZE; } 
+        } else { 
+          if (h > MAX_SIZE) { w *= MAX_SIZE / h; h = MAX_SIZE; } 
+        }
+        canvas.width = w; canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, w, h);
+        onUpdateLocalImage(canvas.toDataURL('image/jpeg', 0.8));
+      };
+      img.src = event.target.result;
     };
     reader.readAsDataURL(file);
     e.target.value = '';
@@ -143,11 +164,6 @@ export default function LocalMap({
           width: mapDimensions.width,
           height: mapDimensions.height,
           backgroundColor: '#1a1a1a',
-          backgroundImage: `
-            linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px)
-          `,
-          backgroundSize: `${GRID_SIZE}px ${GRID_SIZE}px`,
           boxShadow: '0 0 100px rgba(0,0,0,0.8)'
         }}
       >
@@ -165,6 +181,22 @@ export default function LocalMap({
             }}
           />
         )}
+        
+        {/* Grid Overlay */}
+        <div style={{
+          position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
+          pointerEvents: 'none', zIndex: 5,
+          backgroundImage: `
+            linear-gradient(rgba(255, 255, 255, 0.15) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(255, 255, 255, 0.15) 1px, transparent 1px)
+          `,
+          backgroundSize: `${GRID_SIZE}px ${GRID_SIZE}px`
+        }} />
+
+        {/* Local Pings */}
+        {activeLocalPings.map(p => (
+           <div key={p.id} className="ping-circle" style={{ left: p.localX, top: p.localY, '--ping-color': p.color }} />
+        ))}
 
         {/* DM Tokens */}
         {dmTokens.map(t => {

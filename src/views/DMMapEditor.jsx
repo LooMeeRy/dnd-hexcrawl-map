@@ -44,6 +44,7 @@ export default function DMMapEditor() {
     return saved ? JSON.parse(saved) : {};
   });
   const [activePings, setActivePings] = useState([]);
+  const [activeLocalPings, setActiveLocalPings] = useState([]);
   const [pingMode, setPingMode] = useState('none');
   const [dmPingColor, setDmPingColor] = useState('#ff5555');
   const [dmPingSpeed, setDmPingSpeed] = useState('2s');
@@ -85,16 +86,23 @@ export default function DMMapEditor() {
 
   // Save to Local Storage & MQTT Publish Maps + Tokens
   useEffect(() => {
-    localStorage.setItem(`dnd-map-${campaignId}`, JSON.stringify(activeHexes));
-    localStorage.setItem(`dnd-players-${campaignId}`, JSON.stringify(playerTokens));
-    localStorage.setItem(`dnd-dmtokens-${campaignId}`, JSON.stringify(dmTokens));
-    localStorage.setItem(`dnd-persistent-pings-${campaignId}`, JSON.stringify(persistentPings));
-    
-    // Master sync file for Local mode
-    localStorage.setItem('dnd-map-local-sync', JSON.stringify(activeHexes));
-    localStorage.setItem('dnd-players-local-sync', JSON.stringify(playerTokens));
-    localStorage.setItem('dnd-dmtokens-local-sync', JSON.stringify(dmTokens));
-    localStorage.setItem('dnd-persistent-pings-local-sync', JSON.stringify(persistentPings));
+    try {
+      localStorage.setItem(`dnd-map-${campaignId}`, JSON.stringify(activeHexes));
+      localStorage.setItem(`dnd-players-${campaignId}`, JSON.stringify(playerTokens));
+      localStorage.setItem(`dnd-dmtokens-${campaignId}`, JSON.stringify(dmTokens));
+      localStorage.setItem(`dnd-persistent-pings-${campaignId}`, JSON.stringify(persistentPings));
+      
+      // Master sync file for Local mode
+      localStorage.setItem('dnd-map-local-sync', JSON.stringify(activeHexes));
+      localStorage.setItem('dnd-players-local-sync', JSON.stringify(playerTokens));
+      localStorage.setItem('dnd-dmtokens-local-sync', JSON.stringify(dmTokens));
+      localStorage.setItem('dnd-persistent-pings-local-sync', JSON.stringify(persistentPings));
+    } catch (e) {
+      console.error('Storage quota exceeded! Cannot save current map state.', e);
+      if (e.name === 'QuotaExceededError') {
+         alert('Warning: Browser storage quota exceeded! The map could not be saved locally. Try clearing old data or uploading smaller images.');
+      }
+    }
     
     if (mqttClient && roomCode) {
       mqttClient.publish(`dnd-room/${roomCode}/map`, JSON.stringify(activeHexes));
@@ -138,10 +146,16 @@ export default function DMMapEditor() {
         try {
           const action = JSON.parse(message.toString());
           if (action.type === 'ping') {
-             const newPing = { id: Date.now() + Math.random(), q: action.q, r: action.r, color: action.color || '#ff5555' };
-             setActivePings(prev => [...prev, newPing]);
-             setTimeout(() => { setActivePings(prev => prev.filter(p => p.id !== newPing.id)); }, 1000);
-             client.publish(`dnd-room/${code}/events`, JSON.stringify(action)); // Broadcast back to all players
+            const pid = Date.now()+Math.random();
+            setActivePings(prev => [...prev, { id: pid, q: action.q, r: action.r, color: action.color || '#ff5555' }]);
+            setTimeout(() => setActivePings(prev => prev.filter(p => p.id !== pid)), 1000);
+            mqttClient.publish(`dnd-room/${roomCode}/events`, JSON.stringify(action)); // Broadcast to players
+          }
+          if (action.type === 'local_ping') {
+            const pid = Date.now()+Math.random();
+            setActiveLocalPings(prev => [...prev, { id: pid, localX: action.localX, localY: action.localY, color: action.color || '#ff5555' }]);
+            setTimeout(() => setActiveLocalPings(prev => prev.filter(p => p.id !== pid)), 1000);
+            mqttClient.publish(`dnd-room/${roomCode}/events`, JSON.stringify(action)); // Broadcast to players
           }
           if (action.type === 'dice_roll') {
              setIncomingRoll(action);
@@ -463,6 +477,15 @@ export default function DMMapEditor() {
                 return { ...prev, [key]: { ...hex, localImage: imageUrl } };
              });
           }}
+          onLocalPing={(lx, ly) => {
+             const pid = Date.now() + Math.random();
+             setActiveLocalPings(prev => [...prev, { id: pid, localX: lx, localY: ly, color: dmPingColor }]);
+             setTimeout(() => setActiveLocalPings(prev => prev.filter(p => p.id !== pid)), 1000);
+             if (mqttClient && roomCode) {
+               mqttClient.publish(`dnd-room/${roomCode}/events`, JSON.stringify({ type: 'local_ping', localX: lx, localY: ly, color: dmPingColor }));
+             }
+          }}
+          activeLocalPings={activeLocalPings}
           onExit={() => { setViewMode('macro'); setActiveLocalHex(null); }}
         />
       ) : (

@@ -23,6 +23,7 @@ export default function PlayerView() {
   const [dmTokens, setDmTokens] = useState({});
   const [persistentPings, setPersistentPings] = useState({});
   const [activePings, setActivePings] = useState([]);
+  const [activeLocalPings, setActiveLocalPings] = useState([]);
   const [incomingRoll, setIncomingRoll] = useState(null);
   
   const [cameraTarget, setCameraTarget] = useState({ q: 0, r: 0 });
@@ -77,6 +78,12 @@ export default function PlayerView() {
         setActivePings(prev => [...prev, { id: pid, q: event.q, r: event.r, color: event.color }]);
         setTimeout(() => setActivePings(prev => prev.filter(p => p.id !== pid)), 1000);
         setCameraTarget({ q: event.q, r: event.r });
+      }
+      if (e.key === 'dnd-local-local-ping' && e.newValue) {
+        const ping = JSON.parse(e.newValue);
+        const pid = Date.now()+Math.random();
+        setActiveLocalPings(prev => [...prev, { id: pid, localX: ping.localX, localY: ping.localY, color: ping.color }]);
+        setTimeout(() => setActiveLocalPings(prev => prev.filter(p => p.id !== pid)), 1000);
       }
       if (e.key === 'dnd-local-dice-roll' && e.newValue) {
         setIncomingRoll(JSON.parse(e.newValue));
@@ -159,6 +166,10 @@ export default function PlayerView() {
             setActivePings(prev => [...prev, newPing]);
             setTimeout(() => { setActivePings(prev => prev.filter(p => p.id !== newPing.id)); }, 1000);
             if (event.type === 'force_focus') setCameraTarget({ q: event.q, r: event.r });
+          } else if (event.type === 'local_ping') {
+            const newPing = { id: Date.now() + Math.random(), localX: event.localX, localY: event.localY, color: event.color || '#ff5555' };
+            setActiveLocalPings(prev => [...prev, newPing]);
+            setTimeout(() => setActiveLocalPings(prev => prev.filter(p => p.id !== newPing.id)), 1000);
           } else if (event.type === 'dice_roll') {
             setIncomingRoll(event);
           }
@@ -366,6 +377,17 @@ export default function PlayerView() {
           }}
           onUpdateDmToken={() => {}} // Players cannot update DM tokens
           onUpdateLocalImage={() => {}} // Players cannot update images
+          onLocalPing={(lx, ly) => {
+             const pid = Date.now() + Math.random();
+             setActiveLocalPings(prev => [...prev, { id: pid, localX: lx, localY: ly, color: playerColor }]);
+             setTimeout(() => setActiveLocalPings(prev => prev.filter(p => p.id !== pid)), 1000);
+             if (mqttClientRef.current && roomCode) {
+               mqttClientRef.current.publish(`dnd-room/${roomCode}/action`, JSON.stringify({ type: 'local_ping', localX: lx, localY: ly, color: playerColor }));
+             } else {
+               localStorage.setItem('dnd-local-local-ping', JSON.stringify({ localX: lx, localY: ly, color: playerColor, _t: Date.now() }));
+             }
+          }}
+          activeLocalPings={activeLocalPings}
           onExit={() => { setViewMode('macro'); setActiveLocalHex(null); }}
         />
       ) : (
